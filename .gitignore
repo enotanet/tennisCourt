@@ -1,0 +1,5 @@
+TennisCourt/ipch/*
+x64/*
+*.opensdf
+*.obj
+*.tlog
