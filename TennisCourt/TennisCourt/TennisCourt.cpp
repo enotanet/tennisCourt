@@ -24,31 +24,40 @@ int main(int argc, char *argv[])
 
 	CGrabResultPtr ptrGrabResult;
 	namedWindow("CV_Image", WINDOW_AUTOSIZE);
+	namedWindow("CV_Image2", WINDOW_AUTOSIZE);
 	try
 	{
-	
-		CInstantCamera camera( CTlFactory::GetInstance().CreateFirstDevice());
+		DeviceInfoList_t dl;
+		CTlFactory::GetInstance().EnumerateDevices(dl);
+		cout << dl.size() << " cameras found\n";
+		CInstantCamera camera(CTlFactory::GetInstance().CreateDevice(dl[0]));
 		cout << "Using device " << camera.GetDeviceInfo().GetModelName() << endl;
 		camera.Open();
+		CInstantCamera camera2(CTlFactory::GetInstance().CreateDevice(dl[1]));
+		cout << "Using device " << camera2.GetDeviceInfo().GetModelName() << endl;
+		camera2.Open();
 
 		GenApi::CIntegerPtr width(camera.GetNodeMap().GetNode("Width"));
 		GenApi::CIntegerPtr height(camera.GetNodeMap().GetNode("Height"));
 		Mat cv_img(width->GetValue(), height->GetValue(), CV_8UC3);
 
 		camera.StartGrabbing();
+		camera2.StartGrabbing();
 		CPylonImage image;
 		CImageFormatConverter fc;
 		fc.OutputPixelFormat = PixelType_RGB8packed;
 
 		int frames = 0;
+		int frames2 = 0;
 		printf("GRABBING STARTED AT %d\n", time(nullptr));
 		clock_t st = clock();
 		vector<Mat> video;
-		while(camera.IsGrabbing()){
+		vector<Mat> video2;
+		while(camera.IsGrabbing() || camera2.IsGrabbing()){
 			camera.RetrieveResult( 5000, ptrGrabResult, TimeoutHandling_ThrowException);
 			if (ptrGrabResult->GrabSucceeded()){
 					++frames;
-					if (clock() - st > 5 * CLOCKS_PER_SEC)
+					if (clock() - st > 10 * CLOCKS_PER_SEC)
 						break;
 					fc.Convert(image, ptrGrabResult);
 
@@ -61,8 +70,25 @@ int main(int argc, char *argv[])
 						 //camera.StopGrabbing();
 					//}
 			}
+
+			camera2.RetrieveResult( 5000, ptrGrabResult, TimeoutHandling_ThrowException);
+			if (ptrGrabResult->GrabSucceeded()){
+					++frames2;
+					if (clock() - st > 10 * CLOCKS_PER_SEC)
+						break;
+					fc.Convert(image, ptrGrabResult);
+
+					cv_img = cv::Mat(ptrGrabResult->GetHeight(),     ptrGrabResult->GetWidth(), CV_8UC3,(uint8_t*)image.GetBuffer());
+					video2.push_back(cv_img.clone());
+					//cout << cv_img.size() << endl;
+					//imshow("CV_Image",cv_img);
+					//waitKey(1);
+					//if(waitKey(30)==27){
+						 //camera.StopGrabbing();
+					//}
+			}
 		}
-		printf("%d frames grabed in 5 seconds\n", frames);
+		printf("%d, %d frames grabed in 5 seconds\n", frames, frames2);
 		printf("GRABBING FINISHED AT %d\n", time(nullptr));
 
 		int i = 0;
@@ -70,10 +96,11 @@ int main(int argc, char *argv[])
 		{
 			cout << "Showing frame " << i << "\n";
 			imshow("CV_Image", video[i]);
+			imshow("CV_Image2", video2[i]);
 			char c = waitKey(0);
 			if (c == 'k')
 				break;
-			else if (c == 'n' && i + 1 < (int) video.size())
+			else if (c == 'n' && i + 1 < (int) video.size() && i + 1 < (int) video2.size())
 				++i;
 			else if (c == 'p' && i > 0)
 				--i;
