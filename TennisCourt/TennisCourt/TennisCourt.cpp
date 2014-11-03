@@ -2,6 +2,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include "ballFinder.h"
 #include <iostream>
+#include <cstdio>
 #include "utils.h"
 
 using namespace cv;
@@ -17,7 +18,7 @@ int main(int argc, char *argv[])
 	string type = argv[1];
 	if (type == "generate")
 	{
-		Mat img = imread("C:/TennisCourt/TennisCourt/TestData/testBall.jpg");
+		Mat img = imread("TennisCourt/TestData/testBall.JPG");
 
 		if (getCirclesVerify(img))
 			printf("Test results updated!\n");

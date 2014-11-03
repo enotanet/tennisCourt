@@ -54,7 +54,7 @@ void displayCircles(Mat img, vector<Vec3f> circles)
 bool getCirclesVerify(Mat img)
 {
 	vector<Vec3f> circles = getCircles(img);
-	printf("%d\n", circles.size());
+	printf("%lu\n", circles.size());
 	// Draw the circles detected
 	Mat out(img.clone());
 	for (size_t i = 0; i < circles.size(); i++)
@@ -74,9 +74,9 @@ bool getCirclesVerify(Mat img)
 	if (k == 'c')
 	{
 		// Save result
-		imwrite("../TestData/testImg.png", img);
+		imwrite("TennisCourt/TestData/testImg.png", img);
 
-		ofstream fout("C:\\TennisCourt\\TennisCourt\\TestData\\testCircles.txt");
+		ofstream fout("TennisCourt/TestData/testCircles.txt");
 		cout << circles.size() << endl;
 		fout << circles.size() << endl;
 		//fprintf(cirfile, "%u\n", circles.size());
@@ -93,12 +93,12 @@ bool getCirclesVerify(Mat img)
 
 bool getCirclesTest(Mat *img)
 {
-	*img = imread("../TestData/testImg.png");
+	*img = imread("TennisCourt/TestData/testImg.png");
 	vector<Vec3f> circles = getCircles(*img);
 	printf("%d\n", (int) circles.size());
 
 	vector<Vec3f> circles_exp;
-	ifstream fin("C:\\TennisCourt\\TennisCourt\\TestData\\testCircles.txt");
+	ifstream fin("TennisCourt/TestData/testCircles.txt");
 	size_t cir_no;
 	fin >> cir_no;
 	cout << cir_no << endl;
