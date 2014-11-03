@@ -184,6 +184,9 @@ x64/*
 *.opensdf
 *.obj
 *.tlog
+*.log
 *.swp
 *.o
+*.exe
+*.pdb
 binary
