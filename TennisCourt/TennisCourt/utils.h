@@ -2,7 +2,7 @@
 #define UTILS_H__
 
 #include <string>
-
-const std::string kProjPath = "C:/TenisCourt/TennisCourt";
+#include <thread>
+#include <mutex>
 
 #endif

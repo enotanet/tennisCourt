@@ -24,7 +24,10 @@
     <ClCompile Include="ballFinder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source.cpp">
+    <ClCompile Include="camera_frame_grabber.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="video_writer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -36,6 +39,15 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="utils.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="frame_grabber.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="camera_frame_grabber.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="video_writer.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

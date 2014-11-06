@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <cmath>
 #include <cstdlib>
-#include "utils.h"
 #include <fstream>
 
 using namespace std;
