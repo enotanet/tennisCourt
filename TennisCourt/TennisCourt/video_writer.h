@@ -4,6 +4,6 @@
 #include "frame_grabber.h"
 #include <string>
 
-bool writeVideoToFile(std::string filepath, FrameGrabber* fg, int time);
+bool writeVideoToFile(const std::string &filepath, FrameGrabber* fg, int time);
 
 #endif

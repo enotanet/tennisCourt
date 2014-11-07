@@ -7,15 +7,55 @@
 #include <ctime>
 #include "video_writer.h"
 
+#ifdef ITC_SERVER
 #include <pylon/PylonIncludes.h>
+#endif
+
 #include "frame_grabber.h"
-#include "camera_frame_grabber.h"
+#include "file_frame_grabber.h"
+// #include "camera_frame_grabber.h"
 
 using namespace cv;
-using namespace Pylon;
 using namespace std;
 
+void fun() {
+  FileFrameGrabber ffg("TennisCourt/TestData/cut1.avi");
+  writeVideoToFile("video.mpeg", &ffg, 5);
+}
 int main(int argc, char *argv[]) {
+  fun();
+  return 0;
+  FileFrameGrabber ffg("TennisCourt/TestData/cut1.avi");
+  
+  
+  cv::Mat ff(ffg.getMat());
+  // Setup output video
+  cv::VideoWriter output_cap(argv[2], 
+    //CV_FOURCC('F','F','V','1'),
+    CV_FOURCC('H','F','Y','U'),
+    // -1,
+    30,
+    ff.size());
+
+  if (!output_cap.isOpened())
+  {
+     std::cout << "!!! Output video could not be opened" << std::endl;
+       return 0;
+  }
+  
+  
+  // Loop to read from input and write to output
+  cv::Mat frame;
+  
+  while (true)
+  {       
+      if (!ffg.getNextFrame(&frame))             
+                break;
+     std::cout << "FSZ " << frame.size() << std::endl;
+                  
+        output_cap.write(frame);
+  }
+  return 0;
   /*VideoCapture vc("S:\\video.avi");
   Mat frame;
   namedWindow("edges",1);
@@ -23,8 +63,6 @@ int main(int argc, char *argv[]) {
     imshow("edges", frame);
     waitKey();
   }*/
-  CameraFrameGrabber cfg(0);
-  writeVideoToFile("S:\\video.avi", &cfg, 5);
   return 0;
 }
 
