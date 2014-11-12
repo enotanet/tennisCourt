@@ -8,8 +8,8 @@
 
 CameraFrameGrabber::CameraFrameGrabber(int camera_id) {
   // Exceptions in constructor?
-  std::lock_guard<std::mutex> lock(pylonFactoryLock);
-  Pylon::PylonInitialize();
+  //std::lock_guard<std::mutex> lock(pylonFactoryLock);
+  //Pylon::PylonInitialize();
 
   Pylon::DeviceInfoList_t dl;
 	Pylon::CTlFactory::GetInstance().EnumerateDevices(dl);
@@ -27,7 +27,7 @@ CameraFrameGrabber::CameraFrameGrabber(int camera_id) {
 
 CameraFrameGrabber::~CameraFrameGrabber() {
   delete camera;
-  Pylon::PylonTerminate();
+  //Pylon::PylonTerminate();
 }
 
 // Returns false on failure.
@@ -54,7 +54,7 @@ bool CameraFrameGrabber::getNextFrame(cv::Mat *res) {
 
 cv::Mat CameraFrameGrabber::getMat() {
   std::cerr << width->GetValue() << " " << height->GetValue() << std::endl;
-  return cv::Mat(width->GetValue(), height->GetValue(), CV_8UC3);
+  return cv::Mat(height->GetValue(), width->GetValue(), CV_8UC3);
 }
 
-std::mutex CameraFrameGrabber::pylonFactoryLock;
+//std::mutex CameraFrameGrabber::pylonFactoryLock;

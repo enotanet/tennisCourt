@@ -9,12 +9,9 @@
 //
 bool writeVideoToFile(const std::string &filepath, FrameGrabber* fg, int time) {
   cv::Mat cv_img(fg->getMat());
-  cv::VideoWriter vw(filepath, CV_FOURCC_PROMPT, 60, cv_img.size(), /*isColor =*/ false);
-  // cv::CvVideoWriter* vw;
-  //vw = cvCreateVideoWriter(filepath.c_str(), -1, 25, cv_img.size());
-  // cv::VideoWriter vw(filepath, CV_FOURCC('Y','U','Y','V'), 60, cv_img.size(), /*isColor =*/ false);
-  if (!vw.isOpened())
-  {
+  std::cout << "INITIAL SIZE: " << cv_img.size() << std::endl;
+  cv::VideoWriter vw(filepath, CV_FOURCC('D','I','B',' '), 60, cv_img.size(), /*isColor =*/ false);
+  if (!vw.isOpened()) {
      std::cout << "!!! Output video could not be opened" << std::endl;
        return 0;
   }
@@ -24,7 +21,6 @@ bool writeVideoToFile(const std::string &filepath, FrameGrabber* fg, int time) {
   std::cout << "FF " << frames << std::endl;
   while (fg->getNextFrame(&cv_img)) {
     ++frames;
-    //std::cout << "FF " << frames << std::endl;
     vw.write(cv_img);
     if (clock() - start > CLOCKS_PER_SEC * time) {
       std::cout << "FF " << frames << std::endl;

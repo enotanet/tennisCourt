@@ -30,6 +30,12 @@
     <ClCompile Include="video_writer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="file_frame_grabber.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="OldTennisCourt.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ballFinder.h">
@@ -48,6 +54,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="video_writer.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="file_frame_grabber.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

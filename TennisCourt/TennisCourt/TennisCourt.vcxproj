@@ -218,11 +218,14 @@
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='OpenCV_Release|x64'">$(OPENCV_DIR)\..\..\include;$(PYLON_DIR)\lib\x64</AdditionalIncludeDirectories>
     </ClCompile>
     <ClCompile Include="camera_frame_grabber.cpp" />
+    <ClCompile Include="file_frame_grabber.cpp" />
+    <ClCompile Include="OldTennisCourt.cpp" />
     <ClCompile Include="video_writer.cpp" />
     <ClCompile Include="TennisCourt.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ballFinder.h" />
+    <ClInclude Include="file_frame_grabber.h" />
     <ClInclude Include="frame_grabber.h" />
     <ClInclude Include="camera_frame_grabber.h" />
     <ClInclude Include="video_writer.h" />

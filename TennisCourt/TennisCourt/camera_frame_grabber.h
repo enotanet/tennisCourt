@@ -8,9 +8,7 @@
 
 #include "frame_grabber.h"
 #include <opencv2/core/core.hpp>
-#ifdef ITC_SERVER
 #include <pylon/PylonIncludes.h>
-#endif
 
 #include <mutex>
 #include <thread>
