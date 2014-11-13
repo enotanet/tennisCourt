@@ -2,6 +2,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include "ballFinder.h"
 #include <iostream>
+#include <vector>
 #include <cstdio>
 #include "utils.h"
 #include <thread>
@@ -32,6 +33,12 @@
 #include <pylon/gige/PylonGigEIncludes.h>
 #include <pylon/gige/ActionTriggerConfiguration.h>
 
+//-------------------------AVI-------------------------------------
+// Include files to use the PYLON API.
+#include <pylon/AviCompressionOptions.h>
+using namespace GenApi;
+//-------------------------AVI-------------------------------------
+
 // Settings to use Basler GigE cameras.
 using namespace Basler_GigECameraParams;
 
@@ -43,7 +50,74 @@ using namespace std;
 
 using namespace cv;
 
-int c_maxCamerasToUse = 2;
+const int MAX_FRAMES_TO_KEEP = 2720;
+
+struct VideoWriteStuff {
+  int cameraId;
+  CImageFormatConverter fc;
+  CPylonImage img;
+  VideoWriter *vw;
+  int frames;
+  int iter;
+  Size sz;
+
+  VideoWriteStuff() {}
+
+  void upd(int id, Size siz) {
+    cameraId = id;
+    iter = 0;
+    frames = 100000;
+    sz = siz;
+    vw = nullptr;
+    fc.OutputPixelFormat = Pylon::PixelType_Mono8;
+    poke();
+  }
+  ~VideoWriteStuff() {
+    if (vw)
+      delete vw;
+  }
+
+  void poke() {
+    ++frames;
+    if (frames > MAX_FRAMES_TO_KEEP) {
+      ++iter;
+      frames = 0;
+      if (vw)
+      {
+        std::cout << "Closing file " << cameraId << iter-1 << endl;
+        delete vw;
+        vw = nullptr;
+      }
+      char buf[32];
+      sprintf(buf, "%c:\\\\video%d%d.avi", 'G' + cameraId, cameraId, iter);
+      vw = new VideoWriter(buf, CV_FOURCC('D','I','B',' '), 60, sz, false);
+      int attempts = 0;
+      if (!vw->isOpened()) {
+        std::cout << "!!! Output video could not be opened" << std::endl;
+        std::cout << "WTF " << buf << " " << cameraId << " " << iter << " " << frames << "\n";
+      }
+    }
+  }
+};
+
+int c_maxCamerasToUse = 4;
+
+void myconvandwritestuff(VideoWriteStuff *vws, CGrabResultPtr &ptrGrabResult) {
+  vws->fc.Convert(vws->img, ptrGrabResult);
+  Mat res = cv::Mat(1024, 1280, CV_8UC1, (uint8_t*) vws->img.GetBuffer());
+  //cout << cameraIndex << endl;
+  //cout << "Got IMG SIZE " << res.size() << endl;
+  vws->vw->write(res);
+  // vws->poke();
+}
+
+void myconvandwritetovec(CImageFormatConverter *fc, CGrabResultPtr &ptrGrabResult, CPylonImage &img, vector<Mat> *vec) {
+  fc->Convert(img, ptrGrabResult);
+  Mat res = cv::Mat(1024, 1280, CV_8UC1, (uint8_t*) img.GetBuffer());
+  //cout << cameraIndex << endl;
+  //cout << "Got IMG SIZE " << res.size() << endl;
+  vec->push_back(res.clone());
+}
 
 void myconvandwrite(CImageFormatConverter *fc, CGrabResultPtr &ptrGrabResult, CPylonImage &img, VideoWriter &vw) {
   fc->Convert(img, ptrGrabResult);
@@ -51,6 +125,15 @@ void myconvandwrite(CImageFormatConverter *fc, CGrabResultPtr &ptrGrabResult, CP
   //cout << cameraIndex << endl;
   //cout << "Got IMG SIZE " << res.size() << endl;
   vw.write(res);
+}
+
+void aviWriterFunction(CAviWriter *aviWriter, CGrabResultPtr &ptrGrabResult)
+{
+    aviWriter->Add( ptrGrabResult);
+    // If images are skipped, writing AVI frames takes too much processing time.
+    //std::cout << "Images Skipped = " << ptrGrabResult->GetNumberOfSkippedImages() << boolalpha
+    //    << "; Image has been converted = " << !aviWriter->CanAddWithoutConversion( ptrGrabResult)
+    //    << std::endl;
 }
 
 void myfun(CInstantCameraArray &cameras, CImageFormatConverter *fc, CGrabResultPtr &ptrGrabResult, CPylonImage &img, VideoWriter &vw) {
@@ -104,27 +187,16 @@ int main(int argc, char* argv[])
         // set up for free-running continuous acquisition.
         cameras.StartGrabbing(GrabStrategy_LatestImageOnly);
 
-
+        VideoWriteStuff vws[4];
         long long width = GenApi::CIntegerPtr(cameras[0].GetNodeMap().GetNode("Width"))->GetValue();
         long long height = GenApi::CIntegerPtr(cameras[0].GetNodeMap().GetNode("Height"))->GetValue();
-        cout << "W " << width << " H " << height << endl;
+        // cout << "W " << width << " H " << height << endl;
         cv::Mat cv_img(height, width, CV_8UC1); 
-        cv::VideoWriter vw[4];
+        //vw[0].open("S:\\video.avi", CV_FOURCC('F','F','V','1'), 60, cv_img.size(), false);
         for (int i = 0; i < 4; ++i) {
-          char buf[32];
-          sprintf(buf, "S:\\\\video%d.avi", i);
-          cout << "EXPECTED IMG SIZE " << cv_img.size() << endl;
-          vw[i].open(buf, CV_FOURCC('D','I','B',' '), 60, cv_img.size(), false);
-          if (!vw[i].isOpened()) {
-             std::cout << "!!! Output video could not be opened" << std::endl;
-             return 0;
-          }
+          vws[i].upd(i, cv_img.size());
         }
 
-        Pylon::CImageFormatConverter fc[4];
-        for (int i = 0; i < 4; ++i)
-          fc[i].OutputPixelFormat = Pylon::PixelType_Mono8;
-        Pylon::CPylonImage image[4];
         thread t[4];
         int frames = 0;
         long long start = clock();
@@ -168,11 +240,17 @@ int main(int argc, char* argv[])
                   // if (cameraIndex <= 31)
                       // Pylon::DisplayImage(cameraIndex, ptrGrabResult);
                   
+                  // myconvandwritestuff(&vws[cameraIndex], ptrGrabResult[i]);
+                  // myconvandwrite(&fc[cameraIndex], ptrGrabResult[i], image[cameraIndex], vw[cameraIndex]);
                   if (t[cameraIndex].joinable()) {
                     t[cameraIndex].join();
                   }
-                  t[cameraIndex] = std::thread(myconvandwrite, &fc[cameraIndex], ptrGrabResult[i], image[cameraIndex], vw[cameraIndex]);
+                  vws[cameraIndex].poke();
+                  t[cameraIndex] = std::thread(myconvandwritestuff, &vws[cameraIndex], ptrGrabResult[i]);
 
+                  // t[cameraIndex] = std::thread(myconvandwritetovec, &fc[cameraIndex], ptrGrabResult[i], image[cameraIndex], &vids[cameraIndex]);
+                  // t[cameraIndex] = std::thread(myconvandwrite, &fc[cameraIndex], ptrGrabResult[i], image[cameraIndex], vw[cameraIndex]);
+                  // t[cameraIndex] = std::thread(aviWriterFunction, &aviWriter[cameraIndex], ptrGrabResult[i]);
                   // Print the index and the model name of the camera.
                   //cout << "Camera " <<  cameraIndex << ": " << cameras[cameraIndex].GetDeviceInfo().GetModelName() <<
                   //    " (" << cameras[cameraIndex].GetDeviceInfo().GetIpAddress() << ")" << endl;
