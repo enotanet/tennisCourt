@@ -8,6 +8,7 @@
 #include <thread>
 #include <algorithm>
 #include "video_writer.h"
+#include "file_frame_grabber.h"
 
 // Grab_UsingActionCommand.cpp
 /* 
@@ -33,12 +34,6 @@
 #include <pylon/gige/PylonGigEIncludes.h>
 #include <pylon/gige/ActionTriggerConfiguration.h>
 
-//-------------------------AVI-------------------------------------
-// Include files to use the PYLON API.
-#include <pylon/AviCompressionOptions.h>
-using namespace GenApi;
-//-------------------------AVI-------------------------------------
-
 // Settings to use Basler GigE cameras.
 using namespace Basler_GigECameraParams;
 
@@ -50,7 +45,7 @@ using namespace std;
 
 using namespace cv;
 
-const int MAX_FRAMES_TO_KEEP = 2720;
+const int MAX_FRAMES_TO_KEEP = 5720;
 
 struct VideoWriteStuff {
   int cameraId;
@@ -147,7 +142,19 @@ void myfun(CInstantCameraArray &cameras, CImageFormatConverter *fc, CGrabResultP
   vw.write(res);
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[]) {
+  FileFrameGrabber ffg(argv[1]);
+  Mat res;
+  if (!ffg.getNextFrame(&res)) {
+    return -1;
+  }
+	namedWindow("test", CV_WINDOW_AUTOSIZE);
+	imshow("test", res);
+  imwrite(argv[2], res);
+  return 0;
+}
+
+/*int main(int argc, char* argv[])
 {
     int exitCode = 0;
 
@@ -200,7 +207,7 @@ int main(int argc, char* argv[])
         thread t[4];
         int frames = 0;
         long long start = clock();
-        while ((clock() - start) < 10LL * CLOCKS_PER_SEC)
+        while ((clock() - start) < 40LL * CLOCKS_PER_SEC)
         {
           ++frames;
 
@@ -268,7 +275,7 @@ int main(int argc, char* argv[])
               }
           }
         }
-        std::cout << frames << " frames recoreded in 10 seconds\n";
+        std::cout << frames << " frames recoreded in 600 seconds\n";
 
         // In case you want to trigger again you should wait for the camera 
         // to become trigger-ready before issuing the next action command.
@@ -299,3 +306,4 @@ int main(int argc, char* argv[])
 
     return exitCode;
 }
+*/

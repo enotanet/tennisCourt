@@ -7,6 +7,8 @@ FileFrameGrabber::FileFrameGrabber(const std::string &filename) : vc(filename) {
 }
 
 bool FileFrameGrabber::getNextFrame(cv::Mat *res) {
+  if (!vc.isOpened())
+    return false;
   return vc.read(*res);
 }
 
