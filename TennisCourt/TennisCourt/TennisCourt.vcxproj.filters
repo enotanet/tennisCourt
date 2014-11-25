@@ -36,6 +36,9 @@
     <ClCompile Include="OldTennisCourt.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="opticalFlow.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ballFinder.h">

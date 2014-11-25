@@ -142,7 +142,7 @@ void myfun(CInstantCameraArray &cameras, CImageFormatConverter *fc, CGrabResultP
   vw.write(res);
 }
 
-int main(int argc, char *argv[]) {
+/*int main(int argc, char *argv[]) {
   FileFrameGrabber ffg(argv[1]);
   Mat res;
   if (!ffg.getNextFrame(&res)) {
@@ -152,7 +152,7 @@ int main(int argc, char *argv[]) {
 	imshow("test", res);
   imwrite(argv[2], res);
   return 0;
-}
+}*/
 
 /*int main(int argc, char* argv[])
 {

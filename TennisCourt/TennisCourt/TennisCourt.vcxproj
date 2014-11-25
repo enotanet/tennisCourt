@@ -221,6 +221,7 @@
     <ClCompile Include="camera_frame_grabber.cpp" />
     <ClCompile Include="file_frame_grabber.cpp" />
     <ClCompile Include="OldTennisCourt.cpp" />
+    <ClCompile Include="opticalFlow.cpp" />
     <ClCompile Include="video_writer.cpp" />
     <ClCompile Include="TennisCourt.cpp" />
   </ItemGroup>
