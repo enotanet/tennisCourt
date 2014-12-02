@@ -10,12 +10,15 @@ using namespace cv;
 using namespace std;
 
 void processVideo(char*);
+void writeFrameNumber(Mat, VideoCapture);
 
 //global variables
 vector<Mat> frames; // will contain last 'numberOfFrames' frames
-const int numberOfFrames = 6;
+const int numberOfFrames = 4;
 vector<vector<Point2f> > setsOfIsolatedPoints;
 const int maxCoordinateDiff = 40;
+const int maxDistanceBetweenFrames = 50;
+const int minDistanceBetweenFrames = 5;
 vector<struct ballCandidate> ballCandidates;
 Point2f ballPosition;
 Mat frame; //current frame
@@ -60,30 +63,132 @@ bool oppositeSigns(double a, double b) {
 
 bool isSimilar(double a, double b) {
   if (oppositeSigns(a, b)) return false;
-  return abs((b-a) / a) < 0.5;
+  // need something smarter here for the method to work...
+  return abs(b / a) < 1.35 && abs(b / a) > 0.65;
 }
 
-bool matchesCurrentPath(struct ballCandidate candidate, Point2f point) {
+bool matchesCurrentPath(struct ballCandidate candidate, Point2f point, int frameDifference) {
+  cout << "check if " << point << " matches.." << endl;
   Point2f diff = point - candidate.lastPosition;
-  if (!isSimilar(diff.x , candidate.xDiff)) return false;
-  if (!isSimilar(diff.y , candidate.yDiff)) return false;
+  if (!isSimilar(diff.x , frameDifference * candidate.xDiff)) return false;
+  if (!isSimilar(diff.y , frameDifference * candidate.yDiff)) return false;
   //candidate.xdiff = diff.x;
   //candidate.ydiff = diff.y;
   //candidate.lastPosition = point;
+  cout << "found match: " << point << endl;
   return true;
 }
 
-Point2f findCurrentPosition(struct ballCandidate candidate) {
+Point2f findCurrentPosition(ballCandidate candidate, int frameDifference) {
   for (Point2f p : setsOfIsolatedPoints[0]) {
-    if (matchesCurrentPath(candidate, p)) return p;
+    if (matchesCurrentPath(candidate, p, frameDifference)) return p;
   }
   return Point2f(0, 0);
 }
 
-void updateCurrentPosition(struct ballCandidate candidate, Point2f currentPosition) {
-  candidate.xDiff = currentPosition.x - candidate.lastPosition.x;
-  candidate.yDiff = currentPosition.y - candidate.lastPosition.y;
-  candidate.lastPosition = currentPosition;
+void updateCurrentPosition(ballCandidate *candidate, Point2f currentPosition) {
+  (*candidate).xDiff = currentPosition.x - (*candidate).lastPosition.x;
+  (*candidate).yDiff = currentPosition.y - (*candidate).lastPosition.y;
+  (*candidate).lastPosition = currentPosition;
+}
+
+bool hasRightTrajectory(Point2f p) {
+  cout << "check point " << p << endl;
+  int xdiff = 0;
+  int ydiff = 0;
+  Point2f cur = p;
+  bool found;
+  for (int i = numberOfFrames - 2; i >= 0; --i) {
+    vector<Point2f> isolatedPoints = setsOfIsolatedPoints[i];
+    found = false;
+    for (Point2f next : isolatedPoints) {
+      if (norm(cur - next) < maxDistanceBetweenFrames && norm(cur - next) > minDistanceBetweenFrames) {
+        cout << next << " matched!" << endl;
+        if (xdiff == 0) xdiff = next.x - cur.x;
+        else {
+          if (!isSimilar(next.x - cur.x, xdiff)) return false;
+          xdiff = next.x - cur.x;
+        }
+        if (ydiff == 0) ydiff = next.y - cur.y;
+        else {
+          if (!isSimilar(next.y - cur.y, ydiff)) return false;
+          ydiff = next.y - cur.y;
+        }
+        cur = next;
+        found = true;
+        break;
+      }
+    }
+    if (!found) return false;
+  }
+  return true;
+}
+
+ballCandidate recoverBallCandidate(Point2f p) {
+  Point2f cur = p;
+  vector<Point2f> isolatedPoints;
+  int xdiff, ydiff;
+  for (int i = numberOfFrames - 2; i >= 0; --i) {
+    isolatedPoints = setsOfIsolatedPoints[i];
+     for (Point2f next : isolatedPoints) {
+       if (norm(cur - next) < maxDistanceBetweenFrames) {
+         xdiff = next.x - cur.x;
+         ydiff = next.y - cur.y;
+         cur = next;
+         break;
+       }
+     }
+  }
+  ballCandidate candidate;
+  candidate.lastPosition = cur;
+  candidate.xDiff = xdiff;
+  candidate.yDiff = ydiff;
+  return candidate;
+}
+
+vector<Point2f> getCentres(vector<vector<Point> > contours) {
+  vector<Point2f> centres;
+  for (vector<Point> contour : contours) {
+      // for each controur take one point 'representing that contour' 
+      Point2f center(0,0);
+      int numberOfPoints = contour.size();
+      for (Point point : contour) {
+        center.x += point.x;
+        center.y += point.y;
+      }
+      center.x = center.x / numberOfPoints;
+      center.y = center.y / numberOfPoints;
+      centres.push_back(center);
+      //circle(frame, center, 4, Scalar(0, 255, 0), -1, 8);
+  }
+  return centres;
+}
+
+vector<Point2f> getIsolatedPoints(vector<vector<Point> > contours, vector<Point2f> centres) {
+  vector<Point2f> isolatedPoints;
+  for (int i = 0; i < contours.size(); ++i) {
+      Point2f point = centres[i];
+      int contourSize = contours[i].size();
+      int j = 0;
+      for (; j < centres.size(); ++j) {
+        if (i != j) {
+          if (norm(point - centres[j]) < 100) {
+            break;
+          }
+        }
+      }
+    if (j == centres.size()) {
+        // point is isolated
+        isolatedPoints.push_back(point);
+        //circle(frame, point, 4, Scalar(0, 255, 0), -1, 8);
+        //cout << contourSize << endl;
+        if (point.x < frame.rows && point.y < frame.cols) {
+          //Mat part(frame, Range((int) point.x - 10, (int) point.x + 10), Range((int) point.y - 10, (int) point.y + 10));
+          //cout << "Mat for point " << endl << part << endl;
+        }
+    }
+  }
+  return isolatedPoints;
 }
 
 void processVideo(char* videoFilename) {
@@ -98,6 +203,7 @@ void processVideo(char* videoFilename) {
 
   vector<vector<Point> > contours;
   int i = 0;
+  int frameDifference = 1;
   //read input data. ESC or 'q' for quitting
   while( (char)keyboard != 'q' && (char)keyboard != 27 ){
     if ((char) keyboard == 's') {
@@ -121,20 +227,13 @@ void processVideo(char* videoFilename) {
       continue;
     }
 
-    
-    
     //update the background model
     pMOG2.operator()(frame, fgMask, 0.01);
 
-    //get the frame number and write it on the current frame
-    stringstream ss;
-    rectangle(frame, cv::Point(10, 2), cv::Point(100,20),
-                  cv::Scalar(255,255,255), -1);
-    ss << capture.get(CV_CAP_PROP_POS_FRAMES);
-    string frameNumberString = ss.str();
-    putText(frame, frameNumberString.c_str(), cv::Point(15, 15),
-            FONT_HERSHEY_SIMPLEX, 0.5 , cv::Scalar(0,0,0));
 
+    writeFrameNumber(frame, capture);
+    //get the frame number and write it on the current frame
+    
     // do an opening (erosion and dilation) on the mask
     erode(fgMask, fgMask, Mat());
     dilate(fgMask, fgMask, Mat()); 
@@ -143,79 +242,63 @@ void processVideo(char* videoFilename) {
     drawContours(frame,contours,-1,cv::Scalar(0,0,255),2);
 
     
-    vector<Point2f> pointsToTrack;
-    //cout << "Number of contours: " << contours.size() << endl;
-    for (vector<Point> contour : contours) {
-      // for each controur take one point 'representing that contour' 
-      Point2f center(0,0);
-      int numberOfPoints = contour.size();
-      for (Point point : contour) {
-        center.x += point.x;
-        center.y += point.y;
-      }
-      center.x = center.x / numberOfPoints;
-      center.y = center.y / numberOfPoints;
-      pointsToTrack.push_back(center);
-
-      //circle(frame, center, 4, Scalar(0, 255, 0), -1, 8);
-    }
-
+    vector<Point2f> centres = getCentres(contours);
 
     // check for isolated points
-    vector<Point2f> isolatedPts;
-    for (int i = 0; i < pointsToTrack.size(); ++i) {
-      Point2f point = pointsToTrack[i];
-      int contourSize = contours[i].size();
-      int j = 0;
-      for (; j < pointsToTrack.size(); ++j) {
-        if (i != j) {
-          if (norm(point - pointsToTrack[j]) < 2 * contourSize) {
-            break;
-          }
-        }
-      }
-      if (j == pointsToTrack.size()) {
-        // point is isolated
-        isolatedPts.push_back(point);
-        //circle(frame, point, 4, Scalar(0, 255, 0), -1, 8);
-        cout << contourSize << endl;
-        if (point.x < frame.rows && point.y < frame.cols) {
-          //Mat part(frame, Range((int) point.x - 10, (int) point.x + 10), Range((int) point.y - 10, (int) point.y + 10));
-          //cout << "Mat for point " << endl << part << endl;
-        }
-      }
-    }
-
+    vector<Point2f> isolatedPts = getIsolatedPoints(contours, centres);
     updatesetsOfIsolatedPoints(isolatedPts);
 
+    int size = ballCandidates.size();
+    
+    cout << "frame diff: " << frameDifference << endl;
 
     // check ballCandidates...
     if (ballCandidates.size() == 1) {
-      struct ballCandidate candidate = ballCandidates[0];
-      Point2f currentPosition = findCurrentPosition(candidate);
-      if (norm(currentPosition) != 0) 
+      ballCandidate *candidate = &ballCandidates[0];
+      cout << "ball at position: " << (*candidate).lastPosition << endl;
+      Point2f currentPosition = findCurrentPosition(*candidate, frameDifference);
+      cout << "cur pos: " << currentPosition << endl;
+      if (norm(currentPosition) != 0) {
+        cout << "draw a circle " << endl;
+        circle(frame, currentPosition, 4, Scalar(0, 255, 0), -1, 8);
         updateCurrentPosition(candidate, currentPosition);
+        frameDifference = 1;
+      } else ++frameDifference;
       // what if couldnt retrieve ball?
     } else if (ballCandidates.size() > 1) {
-      for (struct ballCandidate candidate : ballCandidates) {
-        Point2f currentPosition = findCurrentPosition(candidate);
+      for (int i = 0; i < ballCandidates.size(); ++i) {
+        ballCandidate *candidate = &ballCandidates[i];
+        Point2f currentPosition = findCurrentPosition(*candidate, frameDifference);
         if (norm(currentPosition) != 0)
           updateCurrentPosition(candidate, currentPosition);
         // again what if not found??
       }
     } else {
       // no ball candidates so far
+      if (setsOfIsolatedPoints.size() == numberOfFrames) {
+        vector<Point2f> startPoints = setsOfIsolatedPoints[numberOfFrames - 1];
+        for (Point2f p : startPoints) {
+          if (hasRightTrajectory(p)) {
+            cout << "right trajectory found!" << endl;
+            ballCandidate candidate = recoverBallCandidate(p);
+            ballCandidates.push_back(candidate);
+            cout << "got candidate" << endl;
+          }
+        }
+      }
     }
+
+    //circle(frame, Point2f(1000, 500), 4, Scalar(0, 255, 0), -1, 8);
 
     for (int i = 0; i < setsOfIsolatedPoints.size(); ++i) {
       vector<Point2f> points = setsOfIsolatedPoints[i];
       for (Point2f p : points) {
-        cout << p << ", ";
+        //cout << p << ", ";
       }
-      cout << endl;
+      //cout << endl;
     }
 
-    for (int i = 0; i < pointsToTrack.size(); ++i) {
+    for (int i = 0; i < centres.size(); ++i) {
       //Mat part(frame, Range((int) pointsToTrack[i].x - 1, (int) pointsToTrack[i].x + 1), Range((int) pointsToTrack[i].y - 1, (int) pointsToTrack[i].y + 1));
       //cout << "Mat for point " << endl << part << endl;
     }
@@ -230,7 +313,7 @@ void processVideo(char* videoFilename) {
     //calcOpticalFlowPyrLK(prevFrame, frame, pointsToTrack, nextPoints, status, err, winSize, 3, termcrit, 0, 0.001);
    
 
-    int size1 = pointsToTrack.size();
+    int size1 = centres.size();
     int size2 = nextPoints.size();
 
     vector<Point2f> ballCandidates;
@@ -263,6 +346,17 @@ void processVideo(char* videoFilename) {
   //delete capture object
   capture.release();
 }
+
+void writeFrameNumber(Mat frame, VideoCapture capture) {
+  stringstream ss;
+  rectangle(frame, cv::Point(10, 2), cv::Point(100,20),
+                  cv::Scalar(255,255,255), -1);
+  ss << capture.get(CV_CAP_PROP_POS_FRAMES);
+  string frameNumberString = ss.str();
+  putText(frame, frameNumberString.c_str(), cv::Point(15, 15),
+          FONT_HERSHEY_SIMPLEX, 0.5 , cv::Scalar(0,0,0));
+}
+
 
 //int main()
 //{
