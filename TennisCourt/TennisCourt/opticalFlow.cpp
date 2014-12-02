@@ -62,6 +62,7 @@ bool oppositeSigns(double a, double b) {
 }
 
 bool isSimilar(double a, double b) {
+  if (abs(a) < 4 && abs(b) < 4) return true;
   if (oppositeSigns(a, b)) return false;
   // need something smarter here for the method to work...
   return abs(b / a) < 1.35 && abs(b / a) > 0.65;
@@ -86,9 +87,9 @@ Point2f findCurrentPosition(ballCandidate candidate, int frameDifference) {
   return Point2f(0, 0);
 }
 
-void updateCurrentPosition(ballCandidate *candidate, Point2f currentPosition) {
-  (*candidate).xDiff = currentPosition.x - (*candidate).lastPosition.x;
-  (*candidate).yDiff = currentPosition.y - (*candidate).lastPosition.y;
+void updateCurrentPosition(ballCandidate *candidate, Point2f currentPosition, int frameDifference) {
+  (*candidate).xDiff = (currentPosition.x - (*candidate).lastPosition.x) / frameDifference;
+  (*candidate).yDiff = (currentPosition.y - (*candidate).lastPosition.y) / frameDifference;
   (*candidate).lastPosition = currentPosition;
 }
 
@@ -261,16 +262,21 @@ void processVideo(char* videoFilename) {
       if (norm(currentPosition) != 0) {
         cout << "draw a circle " << endl;
         circle(frame, currentPosition, 4, Scalar(0, 255, 0), -1, 8);
-        updateCurrentPosition(candidate, currentPosition);
+        updateCurrentPosition(candidate, currentPosition, frameDifference);
         frameDifference = 1;
-      } else ++frameDifference;
+      } else if (frameDifference > 3) {
+        ballCandidates.clear();
+        frameDifference = 1;
+      }
+      else
+        ++frameDifference;
       // what if couldnt retrieve ball?
     } else if (ballCandidates.size() > 1) {
       for (int i = 0; i < ballCandidates.size(); ++i) {
         ballCandidate *candidate = &ballCandidates[i];
         Point2f currentPosition = findCurrentPosition(*candidate, frameDifference);
         if (norm(currentPosition) != 0)
-          updateCurrentPosition(candidate, currentPosition);
+          updateCurrentPosition(candidate, currentPosition, frameDifference);
         // again what if not found??
       }
     } else {
