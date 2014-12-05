@@ -5,6 +5,7 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include <ctime>
 
 using namespace cv;
 using namespace std;
@@ -32,17 +33,17 @@ struct ballCandidate {
   int yDiff;
 };
 
-int main(int argc, char *argv[])
-{
-  //create GUI windows
-  namedWindow("Frame");
-
-  processVideo(argv[1]);
-
-  //destroy GUI windows
-  destroyAllWindows();
-  return EXIT_SUCCESS;
-}
+//int main(int argc, char *argv[])
+//{
+//  //create gui windows
+//  namedwindow("frame");
+//
+//  processvideo(argv[1]);
+//
+//  //destroy gui windows
+//  destroyallwindows();
+//  return exit_success;
+//}
 
 void updateFrames(Mat frame) {
   frames.insert(frames.begin(), frame);
@@ -203,8 +204,10 @@ void processVideo(char* videoFilename) {
   }
 
   vector<vector<Point> > contours;
+  int frameCounter = 0;
   int i = 0;
   int frameDifference = 1;
+  int start = clock();
   //read input data. ESC or 'q' for quitting
   while( (char)keyboard != 'q' && (char)keyboard != 27 ){
     if ((char) keyboard == 's') {
@@ -219,6 +222,7 @@ void processVideo(char* videoFilename) {
     if(!capture.read(frame)) {
       cerr << "Unable to read next frame." << endl;
       cerr << "Exiting..." << endl;
+      break;
       exit(EXIT_FAILURE);
     }
     updateFrames(frame);
@@ -228,11 +232,15 @@ void processVideo(char* videoFilename) {
       continue;
     }
 
+    ++frameCounter;
+    if (frameCounter == 3000)
+      break;
+
     //update the background model
     pMOG2.operator()(frame, fgMask, 0.01);
 
 
-    writeFrameNumber(frame, capture);
+    //writeFrameNumber(frame, capture);
     //get the frame number and write it on the current frame
     
     // do an opening (erosion and dilation) on the mask
@@ -240,7 +248,7 @@ void processVideo(char* videoFilename) {
     dilate(fgMask, fgMask, Mat()); 
 
     findContours(fgMask,contours,CV_RETR_EXTERNAL,CV_CHAIN_APPROX_NONE);
-    drawContours(frame,contours,-1,cv::Scalar(0,0,255),2);
+    drawContours(frame,contours,-1,cv::Scalar(0,0,255),0.1);
 
     
     vector<Point2f> centres = getCentres(contours);
@@ -251,16 +259,16 @@ void processVideo(char* videoFilename) {
 
     int size = ballCandidates.size();
     
-    cout << "frame diff: " << frameDifference << endl;
+    //cout << "frame diff: " << frameDifference << endl;
 
     // check ballCandidates...
     if (ballCandidates.size() == 1) {
       ballCandidate *candidate = &ballCandidates[0];
-      cout << "ball at position: " << (*candidate).lastPosition << endl;
+      //cout << "ball at position: " << (*candidate).lastPosition << endl;
       Point2f currentPosition = findCurrentPosition(*candidate, frameDifference);
-      cout << "cur pos: " << currentPosition << endl;
+      //cout << "cur pos: " << currentPosition << endl;
       if (norm(currentPosition) != 0) {
-        cout << "draw a circle " << endl;
+        //cout << "draw a circle " << endl;
         circle(frame, currentPosition, 4, Scalar(0, 255, 0), -1, 8);
         updateCurrentPosition(candidate, currentPosition, frameDifference);
         frameDifference = 1;
@@ -285,10 +293,10 @@ void processVideo(char* videoFilename) {
         vector<Point2f> startPoints = setsOfIsolatedPoints[numberOfFrames - 1];
         for (Point2f p : startPoints) {
           if (hasRightTrajectory(p)) {
-            cout << "right trajectory found!" << endl;
+            //cout << "right trajectory found!" << endl;
             ballCandidate candidate = recoverBallCandidate(p);
             ballCandidates.push_back(candidate);
-            cout << "got candidate" << endl;
+            //cout << "got candidate" << endl;
           }
         }
       }
@@ -349,6 +357,9 @@ void processVideo(char* videoFilename) {
     //get the input from the keyboard
     keyboard = waitKey( 0 );
   }
+
+  cout << (clock() - start) / CLOCKS_PER_SEC << endl;
+  cout << "frame count " << frameCounter << endl;
   //delete capture object
   capture.release();
 }
