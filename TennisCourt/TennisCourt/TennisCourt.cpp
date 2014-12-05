@@ -4,11 +4,24 @@
 #include <iostream>
 #include <cstring>
 #include <cassert>
+#include <vector>
+#include <string>
+#include "analysis_system.h"
+#include "sys_file_frame_grabber.h"
 #include "utils.h"
 #include "ToolsForTesting/testing.h"
 
 void help() {
   INFO("TODO: print an elaborate help message");
+}
+
+std::vector<std::string> parseFilenames(int argc, char* argv[]) {
+  std::vector<std::string> filenames;
+  // Parse at most 4 videos.
+  //
+  for (int i = 0; i < argc && i < 4; ++i) {
+    filenames.push_back(argv[i]);
+  }
 }
 
 // Modes: from file, from cameras(only support 4 camera mode?).
@@ -19,6 +32,7 @@ void execute(int argc, char *argv[]) {
     // score and display a 2d model of the court.
     //
     INFO("Begin capturing from cameras");
+    RunOnlineSystem();
   } else if (argc >= 1 && !strcmp(argv[0], "calibrate")) {
     // This should be ran only occasionaly.
     //
@@ -38,6 +52,9 @@ void execute(int argc, char *argv[]) {
       help();
       return;
     }
+    std::vector<std::string> filenames = parseFilenames(argc, argv);
+    SystemFileFrameGrabber grabber(filenames);
+    RunOfflineSystem(&grabber);
   }
 }
 

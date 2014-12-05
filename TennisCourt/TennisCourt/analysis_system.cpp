@@ -1,0 +1,80 @@
+#include "analysis_system.h"
+#include "sys_frame_grabber.h"
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <vector>
+
+// Intercepts key presses and does stuff. Needs to remember previous state
+// for everything that we output. Introduce MyImageShow that has a frame buffer 
+// for each named window that we have.
+//
+void RunOfflineSystem(SystemFrameGrabber *grabber) {
+
+  // What about ownership of grabber? Should be system-wide.
+  //
+  OutputBuffer outputBuffer;
+
+  std::vector<cv::Mat> frames = grabber->getContainer();
+  InitialiseOutput(frames.size());
+
+  // TODO(GUI): Introduce some nice slider and stuff!
+  //
+  char last_key = 'n';
+  long long frame_position = -1;
+  while (last_key != 'q' && last_key != 27) {
+    switch (last_key) {
+    case 'p':
+      if (frame_position > 0) {
+        --frame_position;
+      }
+      break;
+    default:
+      // Default behaviour is advance one frame.
+      //
+      ++frame_position;
+      break;
+    }
+
+    if (outputBuffer.lastFrame < frame_position) {
+      grabber->getNextFrames(&frames);
+      OutputResult res;
+      ProcessFrames(frames, res);
+      outputBuffer.put(res);
+    }
+    DisplayOutput(outputBuffer.get(frame_position));
+    last_key = cv::waitKey(0);
+  }
+}
+
+void InitialiseOutput(int windowCount) {
+  for (int i = 0; i < windowCount; ++i) {
+    char name[32];
+    sprintf(name, "Window %d", i);
+    cv::namedWindow(name, CV_WINDOW_AUTOSIZE);
+  }
+}
+
+void DisplayOutput(OutputResult output) {
+  for (size_t i = 0; i < output.images.size(); ++i) {
+    char name[32];
+    sprintf(name, "Window %u", i);
+    cv::imshow(name, output.images[i]);
+  }
+}
+
+OutputResult OutputBuffer::get(long long timestamp) {
+  return results[timestamp % max_frames_to_keep];
+}
+
+// A lot of copying going around. Mat make break things.
+//
+void OutputBuffer::put(OutputResult res) {
+  ++lastFrame;
+  results[lastFrame % max_frames_to_keep] = res;
+}
+
+// TODO: Main function that deals with processing each set of frames.
+// Put the results in outputResult so it can be used to display now or later
+//
+void ProcessFrames(std::vector<cv::Mat> frames, OutputResult &ouputResult) {
+}
