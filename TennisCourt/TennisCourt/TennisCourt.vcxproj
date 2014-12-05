@@ -215,6 +215,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="backup\NotSoOldTennisCourt.cpp" />
     <ClCompile Include="ballFinder.cpp">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='OpenCV_Release|x64'">$(OPENCV_DIR)\..\..\include;$(PYLON_DIR)\lib\x64</AdditionalIncludeDirectories>
     </ClCompile>
@@ -223,6 +224,7 @@
     <ClCompile Include="file_frame_grabber.cpp" />
     <ClCompile Include="OldTennisCourt.cpp" />
     <ClCompile Include="opticalFlow.cpp" />
+    <ClCompile Include="ToolsForTesting\testing.cpp" />
     <ClCompile Include="video_writer.cpp" />
     <ClCompile Include="TennisCourt.cpp" />
   </ItemGroup>
@@ -231,6 +233,7 @@
     <ClInclude Include="file_frame_grabber.h" />
     <ClInclude Include="frame_grabber.h" />
     <ClInclude Include="camera_frame_grabber.h" />
+    <ClInclude Include="ToolsForTesting\testing.h" />
     <ClInclude Include="video_writer.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="testCV.h" />

@@ -13,6 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Source Files\backup">
+      <UniqueIdentifier>{7d1ed3aa-732b-4006-b2a2-384d329bf120}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\ToolsForTesting">
+      <UniqueIdentifier>{d2f623f0-5379-4230-819b-e2d6f88a7974}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -33,14 +39,20 @@
     <ClCompile Include="file_frame_grabber.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="OldTennisCourt.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="opticalFlow.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="camera_calibration.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="backup\NotSoOldTennisCourt.cpp">
+      <Filter>Source Files\backup</Filter>
+    </ClCompile>
+    <ClCompile Include="OldTennisCourt.cpp">
+      <Filter>Source Files\backup</Filter>
+    </ClCompile>
+    <ClCompile Include="ToolsForTesting\testing.cpp">
+      <Filter>Source Files\ToolsForTesting</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -64,6 +76,9 @@
     </ClInclude>
     <ClInclude Include="file_frame_grabber.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ToolsForTesting\testing.h">
+      <Filter>Source Files\ToolsForTesting</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
