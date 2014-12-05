@@ -8,7 +8,7 @@
 
 // Debug prints stuff only when not in release mode
 //
-#ifdef RELEASE
+#ifndef NDEBUG
 #define DEBUG(x) do {} while (0)
 #else
 #define DEBUG(x) do { std::cerr << x << std::endl; } while (0)
