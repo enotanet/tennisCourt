@@ -5,8 +5,8 @@
  Number of inner corners per a item row and column. (square, circle) 
 -->
 
-<BoardSize_Width>8</BoardSize_Width>
-<BoardSize_Height>8</BoardSize_Height>
+<BoardSize_Width>7</BoardSize_Width>
+<BoardSize_Height>7</BoardSize_Height>
 
 <!--
  The size of a square in some user defined metric system (pixel, millimeter)
