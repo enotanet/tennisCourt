@@ -33,6 +33,11 @@ void execute(int argc, char *argv[]) {
     // First implement jumping by frames.
     //
     INFO("Analysis from file");
+    if (argc <= 4) {
+      INFO("File analysis requires at least 4 video files");
+      help();
+      return;
+    }
   }
 }
 
