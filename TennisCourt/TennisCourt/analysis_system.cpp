@@ -1,5 +1,6 @@
 #include "analysis_system.h"
 #include "sys_frame_grabber.h"
+#include "utils.h"
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <vector>
@@ -9,13 +10,16 @@
 // for each named window that we have.
 //
 void RunOfflineSystem(SystemFrameGrabber *grabber) {
-
+  INFO("Running Offline System");
   // What about ownership of grabber? Should be system-wide.
   //
   OutputBuffer outputBuffer;
 
   std::vector<cv::Mat> frames = grabber->getContainer();
   InitialiseOutput(frames.size());
+  FrameProcessor proc(frames.size());
+
+  INFO("Found " << frames.size() << " things");
 
   // TODO(GUI): Introduce some nice slider and stuff!
   //
@@ -38,7 +42,7 @@ void RunOfflineSystem(SystemFrameGrabber *grabber) {
     if (outputBuffer.lastFrame < frame_position) {
       grabber->getNextFrames(&frames);
       OutputResult res;
-      ProcessFrames(frames, res);
+      proc.ProcessFrames(frames, res);
       outputBuffer.put(res);
     }
     DisplayOutput(outputBuffer.get(frame_position));
@@ -46,8 +50,8 @@ void RunOfflineSystem(SystemFrameGrabber *grabber) {
   }
 }
 
-void InitialiseOutput(int windowCount) {
-  for (int i = 0; i < windowCount; ++i) {
+void InitialiseOutput(size_t windowCount) {
+  for (size_t i = 0; i < windowCount; ++i) {
     char name[32];
     sprintf(name, "Window %d", i);
     cv::namedWindow(name, CV_WINDOW_AUTOSIZE);
@@ -76,5 +80,17 @@ void OutputBuffer::put(OutputResult res) {
 // TODO: Main function that deals with processing each set of frames.
 // Put the results in outputResult so it can be used to display now or later
 //
-void ProcessFrames(std::vector<cv::Mat> frames, OutputResult &ouputResult) {
+void FrameProcessor::ProcessFrames(std::vector<cv::Mat> frames, OutputResult &outputResult) {
+  // Multithread this & reading maybe. Reduce the number of clones!
+  for (size_t i = 0; i < frames.size(); ++i) {
+    cv::Point2f ballPosition;
+    if (ballFinders[i].addFrame(frames[i], ballPosition)) {
+      cv::circle(frames[i], ballPosition, 4, cv::Scalar(0, 255, 0), -1, 8);
+    }
+    outputResult.images.push_back(frames[i].clone());
+  }
 }
+
+void RunOnlineSystem() {
+}
+

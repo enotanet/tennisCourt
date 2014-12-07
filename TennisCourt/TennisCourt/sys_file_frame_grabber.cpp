@@ -1,3 +1,4 @@
+#include "utils.h"
 #include "file_frame_grabber.h"
 #include "sys_file_frame_grabber.h"
 #include <cassert>
@@ -7,6 +8,7 @@
 #include <vector>
 
 SystemFileFrameGrabber::SystemFileFrameGrabber(const std::vector<std::string> &filenames) {
+  INFO("Initialising grabber with " << filenames.size() << " fiels");
   for (const auto &filename : filenames) {
     grabbers.emplace_back(FileFrameGrabber(filename));
   }
@@ -24,6 +26,7 @@ bool SystemFileFrameGrabber::getNextFrames(std::vector<cv::Mat> *res) {
 
 std::vector<cv::Mat> SystemFileFrameGrabber::getContainer() {
   std::vector<cv::Mat> cont;
+  INFO("Grabber with " << grabbers.size() << " items");
   for (auto &fg : grabbers) {
     cont.push_back(fg.getMat());
   }

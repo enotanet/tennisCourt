@@ -2,12 +2,17 @@
 #define ANALYSIS_SYSTEM_H__
 
 #include "sys_frame_grabber.h"
+#include "ballFinder.h"
 #include <opencv2/core/core.hpp>
 #include <vector>
 
 void RunOnlineSystem();
 
 void RunOfflineSystem(SystemFrameGrabber *grabber);
+
+struct OutputResult {
+  std::vector<cv::Mat> images;
+};
 
 // Buffer that holds everything produced when processing frames.
 // TODO(perf): Will end up consuming too much memory. Keep a limited #frames,
@@ -27,15 +32,19 @@ private:
   std::vector<OutputResult> results;
 };
 
-struct OutputResult {
-  std::vector<cv::Mat> images;
+class FrameProcessor {
+public:
+  FrameProcessor(size_t frame_number) : ballFinders(frame_number) {}
+  // Maybe bools?
+  // Needs state! Wrap in a class.
+  //
+  void ProcessFrames(std::vector<cv::Mat> frames, OutputResult& outputResult);
+
+private:
+  std::vector<BallFinder> ballFinders;
 };
 
-// Maybe bools?
-//
-void ProcessFrames(std::vector<cv::Mat> frames, OutputResult& ouputResult);
-
-void InitialiseOutput(int windowCount);
+void InitialiseOutput(size_t windowCount);
 
 void DisplayOutput(OutputResult output);
 

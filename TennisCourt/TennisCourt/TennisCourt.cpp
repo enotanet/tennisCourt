@@ -21,7 +21,9 @@ std::vector<std::string> parseFilenames(int argc, char* argv[]) {
   //
   for (int i = 0; i < argc && i < 4; ++i) {
     filenames.push_back(argv[i]);
+    INFO("Parsed filename " << filenames.back());
   }
+  return filenames;
 }
 
 // Modes: from file, from cameras(only support 4 camera mode?).
@@ -47,13 +49,18 @@ void execute(int argc, char *argv[]) {
     // First implement jumping by frames.
     //
     INFO("Analysis from file");
-    if (argc <= 4) {
-      INFO("File analysis requires at least 4 video files");
+    if (argc < 4) {
+      INFO("File analysis requires at least 4 video files.  Got " << argc);
+      for (int i = 0; i < argc; ++i) {
+        INFO(argv[i]);
+      }
       help();
       return;
     }
     std::vector<std::string> filenames = parseFilenames(argc, argv);
+    INFO("Parsed filenames");
     SystemFileFrameGrabber grabber(filenames);
+    INFO("Grabber initialised");
     RunOfflineSystem(&grabber);
   }
 }

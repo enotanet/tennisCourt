@@ -288,25 +288,29 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="analysis_system.cpp" />
     <ClCompile Include="backup\NotSoOldTennisCourt.cpp" />
     <ClCompile Include="ballFinder.cpp">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='OpenCV_Release|x64'">$(OPENCV_DIR)\..\..\include;$(PYLON_DIR)\lib\x64</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='OpenCV_Debug|x64'">$(OPENCV_DIR)\..\..\include;$(PYLON_DIR)\lib\x64</AdditionalIncludeDirectories>
     </ClCompile>
-    <ClCompile Include="camera_calibration.cpp" />
     <ClCompile Include="camera_frame_grabber.cpp" />
     <ClCompile Include="file_frame_grabber.cpp" />
     <ClCompile Include="OldTennisCourt.cpp" />
     <ClCompile Include="opticalFlow.cpp" />
+    <ClCompile Include="sys_file_frame_grabber.cpp" />
     <ClCompile Include="ToolsForTesting\testing.cpp" />
     <ClCompile Include="video_writer.cpp" />
     <ClCompile Include="TennisCourt.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="analysis_system.h" />
     <ClInclude Include="ballFinder.h" />
     <ClInclude Include="file_frame_grabber.h" />
     <ClInclude Include="frame_grabber.h" />
     <ClInclude Include="camera_frame_grabber.h" />
+    <ClInclude Include="sys_file_frame_grabber.h" />
+    <ClInclude Include="sys_frame_grabber.h" />
     <ClInclude Include="ToolsForTesting\testing.h" />
     <ClInclude Include="video_writer.h" />
     <ClInclude Include="utils.h" />

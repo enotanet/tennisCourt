@@ -19,6 +19,9 @@
     <Filter Include="Source Files\ToolsForTesting">
       <UniqueIdentifier>{d2f623f0-5379-4230-819b-e2d6f88a7974}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\FrameGrabbers">
+      <UniqueIdentifier>{5d72a327-7888-47fe-9ccb-ca6778ab5e73}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -30,19 +33,10 @@
     <ClCompile Include="ballFinder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="camera_frame_grabber.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="video_writer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="file_frame_grabber.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="opticalFlow.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="camera_calibration.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="backup\NotSoOldTennisCourt.cpp">
@@ -53,6 +47,18 @@
     </ClCompile>
     <ClCompile Include="ToolsForTesting\testing.cpp">
       <Filter>Source Files\ToolsForTesting</Filter>
+    </ClCompile>
+    <ClCompile Include="camera_frame_grabber.cpp">
+      <Filter>Source Files\FrameGrabbers</Filter>
+    </ClCompile>
+    <ClCompile Include="file_frame_grabber.cpp">
+      <Filter>Source Files\FrameGrabbers</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_file_frame_grabber.cpp">
+      <Filter>Source Files\FrameGrabbers</Filter>
+    </ClCompile>
+    <ClCompile Include="analysis_system.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -65,20 +71,29 @@
     <ClInclude Include="utils.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="frame_grabber.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="camera_frame_grabber.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="video_writer.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="file_frame_grabber.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="ToolsForTesting\testing.h">
       <Filter>Source Files\ToolsForTesting</Filter>
+    </ClInclude>
+    <ClInclude Include="camera_frame_grabber.h">
+      <Filter>Source Files\FrameGrabbers</Filter>
+    </ClInclude>
+    <ClInclude Include="file_frame_grabber.h">
+      <Filter>Source Files\FrameGrabbers</Filter>
+    </ClInclude>
+    <ClInclude Include="frame_grabber.h">
+      <Filter>Source Files\FrameGrabbers</Filter>
+    </ClInclude>
+    <ClInclude Include="sys_file_frame_grabber.h">
+      <Filter>Source Files\FrameGrabbers</Filter>
+    </ClInclude>
+    <ClInclude Include="sys_frame_grabber.h">
+      <Filter>Source Files\FrameGrabbers</Filter>
+    </ClInclude>
+    <ClInclude Include="analysis_system.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
