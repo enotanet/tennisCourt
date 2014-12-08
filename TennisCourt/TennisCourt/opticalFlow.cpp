@@ -29,8 +29,8 @@ int keyboard;
 
 struct ballCandidate {
   Point2f lastPosition;
-  int xDiff;
-  int yDiff;
+  double xDiff;
+  double yDiff;
 };
 
 //int main(int argc, char *argv[])
@@ -96,8 +96,8 @@ void updateCurrentPosition(ballCandidate *candidate, Point2f currentPosition, in
 
 bool hasRightTrajectory(Point2f p) {
   cout << "check point " << p << endl;
-  int xdiff = 0;
-  int ydiff = 0;
+  double xdiff = 0;
+  double ydiff = 0;
   Point2f cur = p;
   bool found;
   for (int i = numberOfFrames - 2; i >= 0; --i) {
@@ -106,12 +106,12 @@ bool hasRightTrajectory(Point2f p) {
     for (Point2f next : isolatedPoints) {
       if (norm(cur - next) < maxDistanceBetweenFrames && norm(cur - next) > minDistanceBetweenFrames) {
         cout << next << " matched!" << endl;
-        if (xdiff == 0) xdiff = next.x - cur.x;
+        if (abs(xdiff) < 1e-8) xdiff = next.x - cur.x;
         else {
           if (!isSimilar(next.x - cur.x, xdiff)) return false;
           xdiff = next.x - cur.x;
         }
-        if (ydiff == 0) ydiff = next.y - cur.y;
+        if (abs(ydiff) < 1e-8) ydiff = next.y - cur.y;
         else {
           if (!isSimilar(next.y - cur.y, ydiff)) return false;
           ydiff = next.y - cur.y;
@@ -129,7 +129,7 @@ bool hasRightTrajectory(Point2f p) {
 ballCandidate recoverBallCandidate(Point2f p) {
   Point2f cur = p;
   vector<Point2f> isolatedPoints;
-  int xdiff, ydiff;
+  double xdiff, ydiff;
   for (int i = numberOfFrames - 2; i >= 0; --i) {
     isolatedPoints = setsOfIsolatedPoints[i];
      for (Point2f next : isolatedPoints) {
@@ -153,7 +153,7 @@ vector<Point2f> getCentres(vector<vector<Point> > contours) {
   for (vector<Point> contour : contours) {
       // for each controur take one point 'representing that contour' 
       Point2f center(0,0);
-      int numberOfPoints = contour.size();
+      size_t numberOfPoints = contour.size();
       for (Point point : contour) {
         center.x += point.x;
         center.y += point.y;
@@ -168,10 +168,10 @@ vector<Point2f> getCentres(vector<vector<Point> > contours) {
 
 vector<Point2f> getIsolatedPoints(vector<vector<Point> > contours, vector<Point2f> centres) {
   vector<Point2f> isolatedPoints;
-  for (int i = 0; i < contours.size(); ++i) {
+  for (size_t i = 0; i < contours.size(); ++i) {
       Point2f point = centres[i];
-      int contourSize = contours[i].size();
-      int j = 0;
+      size_t contourSize = contours[i].size();
+      size_t j = 0;
       for (; j < centres.size(); ++j) {
         if (i != j) {
           if (norm(point - centres[j]) < 100) {
@@ -257,7 +257,7 @@ void processVideo(char* videoFilename) {
     vector<Point2f> isolatedPts = getIsolatedPoints(contours, centres);
     updatesetsOfIsolatedPoints(isolatedPts);
 
-    int size = ballCandidates.size();
+    size_t size = ballCandidates.size();
     
     //cout << "frame diff: " << frameDifference << endl;
 
@@ -327,8 +327,8 @@ void processVideo(char* videoFilename) {
     //calcOpticalFlowPyrLK(prevFrame, frame, pointsToTrack, nextPoints, status, err, winSize, 3, termcrit, 0, 0.001);
    
 
-    int size1 = centres.size();
-    int size2 = nextPoints.size();
+    size_t size1 = centres.size();
+    size_t size2 = nextPoints.size();
 
     vector<Point2f> ballCandidates;
 

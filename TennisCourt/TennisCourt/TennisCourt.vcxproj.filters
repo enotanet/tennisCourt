@@ -22,6 +22,9 @@
     <Filter Include="Source Files\FrameGrabbers">
       <UniqueIdentifier>{5d72a327-7888-47fe-9ccb-ca6778ab5e73}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\VideoWriter">
+      <UniqueIdentifier>{bff0a973-36ec-4ac6-9d65-11f6bcf7d64f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -60,6 +63,15 @@
     <ClCompile Include="analysis_system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="sys_camera_grabber.cpp">
+      <Filter>Source Files\FrameGrabbers</Filter>
+    </ClCompile>
+    <ClCompile Include="utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_video_writer.cpp">
+      <Filter>Source Files\VideoWriter</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ballFinder.h">
@@ -94,6 +106,12 @@
     </ClInclude>
     <ClInclude Include="analysis_system.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sys_camera_grabber.h">
+      <Filter>Source Files\FrameGrabbers</Filter>
+    </ClInclude>
+    <ClInclude Include="sys_video_writer.h">
+      <Filter>Source Files\VideoWriter</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

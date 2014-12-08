@@ -6,7 +6,7 @@
 #include <opencv2/core/core.hpp>
 #include <vector>
 
-void RunOnlineSystem();
+void RunOnlineSystem(SystemFrameGrabber *grabber);
 
 void RunOfflineSystem(SystemFrameGrabber *grabber);
 
@@ -38,7 +38,7 @@ public:
   // Maybe bools?
   // Needs state! Wrap in a class.
   //
-  void ProcessFrames(std::vector<cv::Mat> frames, OutputResult& outputResult);
+  void ProcessFrames(std::vector<cv::Mat> frames, OutputResult *outputResult);
 
 private:
   std::vector<BallFinder> ballFinders;

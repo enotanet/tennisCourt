@@ -8,7 +8,7 @@
 #include <vector>
 
 SystemFileFrameGrabber::SystemFileFrameGrabber(const std::vector<std::string> &filenames) {
-  INFO("Initialising grabber with " << filenames.size() << " fiels");
+  INFO("Initialising grabber with " << filenames.size() << " files");
   for (const auto &filename : filenames) {
     grabbers.emplace_back(FileFrameGrabber(filename));
   }

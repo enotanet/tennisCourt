@@ -6,8 +6,8 @@
 
 struct ballCandidate {
   cv::Point2f lastPosition;
-  int xDiff;
-  int yDiff;
+  double xDiff;
+  double yDiff;
 };
 
 // Might be refactored into general object detector. Or some
@@ -29,7 +29,6 @@ private:
   std::vector<cv::Point2f> getCentres(std::vector< std::vector<cv::Point> > contours);
   std::vector<cv::Point2f> getIsolatedPoints(std::vector< std::vector<cv::Point> > contours, std::vector<cv::Point2f> centres);
   void updateCurrentPosition(ballCandidate *candidate, cv::Point2f currentPosition, int frameDifference);
-
 
   std::vector<cv::Mat> frames; // will contain last 'numberOfFrames' frames
   static const int numberOfFrames = 4;

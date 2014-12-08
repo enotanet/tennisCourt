@@ -11,6 +11,8 @@
 using namespace cv;
 using namespace std;
 
+const double eps = 1e-7;
+
 void processVideo(char*);
 void writeFrameNumber(Mat, VideoCapture);
 
@@ -41,14 +43,14 @@ bool BallFinder::isSimilar(double a, double b) {
 }
 
 bool BallFinder::matchesCurrentPath(struct ballCandidate candidate, Point2f point, int frameDifference) {
-  cout << "check if " << point << " matches.." << endl;
+  //cout << "check if " << point << " matches.." << endl;
   Point2f diff = point - candidate.lastPosition;
   if (!isSimilar(diff.x , frameDifference * candidate.xDiff)) return false;
   if (!isSimilar(diff.y , frameDifference * candidate.yDiff)) return false;
   //candidate.xdiff = diff.x;
   //candidate.ydiff = diff.y;
   //candidate.lastPosition = point;
-  cout << "found match: " << point << endl;
+  //cout << "found match: " << point << endl;
   return true;
 }
 
@@ -66,9 +68,9 @@ void BallFinder::updateCurrentPosition(ballCandidate *candidate, Point2f current
 }
 
 bool BallFinder::hasRightTrajectory(Point2f p) {
-  cout << "check point " << p << endl;
-  int xdiff = 0;
-  int ydiff = 0;
+  //cout << "check point " << p << endl;
+  double xdiff = 0;
+  double ydiff = 0;
   Point2f cur = p;
   bool found;
   for (int i = numberOfFrames - 2; i >= 0; --i) {
@@ -76,13 +78,13 @@ bool BallFinder::hasRightTrajectory(Point2f p) {
     found = false;
     for (Point2f next : isolatedPoints) {
       if (norm(cur - next) < maxDistanceBetweenFrames && norm(cur - next) > minDistanceBetweenFrames) {
-        cout << next << " matched!" << endl;
-        if (xdiff == 0) xdiff = next.x - cur.x;
+        //cout << next << " matched!" << endl;
+        if (abs(xdiff) < eps) xdiff = next.x - cur.x;
         else {
           if (!isSimilar(next.x - cur.x, xdiff)) return false;
           xdiff = next.x - cur.x;
         }
-        if (ydiff == 0) ydiff = next.y - cur.y;
+        if (abs(ydiff) < eps) ydiff = next.y - cur.y;
         else {
           if (!isSimilar(next.y - cur.y, ydiff)) return false;
           ydiff = next.y - cur.y;
@@ -100,7 +102,7 @@ bool BallFinder::hasRightTrajectory(Point2f p) {
 ballCandidate BallFinder::recoverBallCandidate(Point2f p) {
   Point2f cur = p;
   vector<Point2f> isolatedPoints;
-  int xdiff, ydiff;
+  double xdiff, ydiff;
   for (int i = numberOfFrames - 2; i >= 0; --i) {
     isolatedPoints = setsOfIsolatedPoints[i];
      for (Point2f next : isolatedPoints) {
@@ -124,7 +126,7 @@ vector<Point2f> BallFinder::getCentres(vector<vector<Point> > contours) {
   for (vector<Point> contour : contours) {
       // for each controur take one point 'representing that contour' 
       Point2f center(0,0);
-      int numberOfPoints = contour.size();
+      size_t numberOfPoints = contour.size();
       for (Point point : contour) {
         center.x += point.x;
         center.y += point.y;
@@ -139,9 +141,9 @@ vector<Point2f> BallFinder::getCentres(vector<vector<Point> > contours) {
 
 vector<Point2f> BallFinder::getIsolatedPoints(vector<vector<Point> > contours, vector<Point2f> centres) {
   vector<Point2f> isolatedPoints;
-  for (int i = 0; i < contours.size(); ++i) {
+  for (size_t i = 0; i < contours.size(); ++i) {
       Point2f point = centres[i];
-      int contourSize = contours[i].size();
+      size_t contourSize = contours[i].size();
       int j = 0;
       for (; j < centres.size(); ++j) {
         if (i != j) {
@@ -172,14 +174,13 @@ bool BallFinder::addFrame(const cv::Mat &frame, cv::Point2f &ballpos) {
   findContours(fgMask,  contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
   drawContours(frame, contours, -1, cv::Scalar(0, 0, 255), 0.1);
 
-    
   vector<Point2f> centres = getCentres(contours);
 
   // check for isolated points
   vector<Point2f> isolatedPts = getIsolatedPoints(contours, centres);
   updatesetsOfIsolatedPoints(isolatedPts);
 
-  int size = ballCandidates.size();
+  size_t size = ballCandidates.size();
   
   bool found = false;
   // check ballCandidates...

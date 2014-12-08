@@ -36,7 +36,7 @@ bool CameraFrameGrabber::getNextFrame(cv::Mat *res) {
     return 0;
   }
   try {
-    camera->RetrieveResult( 5000, ptrGrabResult, Pylon::TimeoutHandling_ThrowException);
+    camera->RetrieveResult(5000, ptrGrabResult, Pylon::TimeoutHandling_ThrowException);
 		if (ptrGrabResult->GrabSucceeded()) {
       fc.Convert(image, ptrGrabResult);
 			*res = cv::Mat(ptrGrabResult->GetHeight(), ptrGrabResult->GetWidth(), CV_8UC3, (uint8_t*) image.GetBuffer());
