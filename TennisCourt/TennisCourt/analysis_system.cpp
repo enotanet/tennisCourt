@@ -1,4 +1,5 @@
 #include "analysis_system.h"
+#include "camera_location.h"
 #include "sys_frame_grabber.h"
 #include "utils.h"
 #include <opencv2/core/core.hpp>
@@ -88,6 +89,10 @@ void FrameProcessor::ProcessFrames(std::vector<cv::Mat> frames, OutputResult *ou
     cv::Point2f ballPosition;
     if (ballFinders[i].addFrame(frames[i], ballPosition)) {
       cv::circle(frames[i], ballPosition, 4, cv::Scalar(0, 255, 0), -1, 8);
+    }
+    cv::Point3f cameraCoords;
+    if (!cameraLocations[i].GetCoordinate(frames[i], &cameraCoords)) {
+      // Oops. Don't continue with analysis
     }
     outputResult->images.push_back(frames[i].clone());
   }

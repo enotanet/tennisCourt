@@ -72,6 +72,9 @@
     <ClCompile Include="sys_video_writer.cpp">
       <Filter>Source Files\VideoWriter</Filter>
     </ClCompile>
+    <ClCompile Include="camera_location.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ballFinder.h">
@@ -112,6 +115,9 @@
     </ClInclude>
     <ClInclude Include="sys_video_writer.h">
       <Filter>Source Files\VideoWriter</Filter>
+    </ClInclude>
+    <ClInclude Include="camera_location.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

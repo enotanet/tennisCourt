@@ -1,6 +1,7 @@
 #ifndef ANALYSIS_SYSTEM_H__
 #define ANALYSIS_SYSTEM_H__
 
+#include "camera_location.h"
 #include "sys_frame_grabber.h"
 #include "ballFinder.h"
 #include <opencv2/core/core.hpp>
@@ -34,7 +35,7 @@ private:
 
 class FrameProcessor {
 public:
-  FrameProcessor(size_t frame_number) : ballFinders(frame_number) {}
+  FrameProcessor(size_t frame_number) : ballFinders(frame_number), cameraLocations(frame_number) {}
   // Maybe bools?
   // Needs state! Wrap in a class.
   //
@@ -42,6 +43,7 @@ public:
 
 private:
   std::vector<BallFinder> ballFinders;
+  std::vector<CameraLocation> cameraLocations;
 };
 
 void InitialiseOutput(size_t windowCount);
