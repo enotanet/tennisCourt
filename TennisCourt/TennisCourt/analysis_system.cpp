@@ -87,8 +87,12 @@ void FrameProcessor::ProcessFrames(std::vector<cv::Mat> frames, OutputResult *ou
   // Multithread this & reading maybe. Reduce the number of clones!
   for (size_t i = 0; i < frames.size(); ++i) {
     cv::Point2f ballPosition;
-    if (ballFinders[i].addFrame(frames[i], ballPosition)) {
+    std::vector<person> players;
+    if (ballFinders[i].addFrame(frames[i], ballPosition, players)) {
       cv::circle(frames[i], ballPosition, 4, cv::Scalar(0, 255, 0), -1, 8);
+    }
+    if (players.size() > 0) {
+      // do something with the players positions
     }
     cv::Point3f cameraCoords;
     if (!cameraLocations[i].GetCoordinate(frames[i], &cameraCoords)) {
