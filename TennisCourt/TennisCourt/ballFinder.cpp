@@ -67,6 +67,41 @@ void BallFinder::updateCurrentPosition(ballCandidate *candidate, Point2f current
   (*candidate).lastPosition = currentPosition;
 }
 
+vector<ballCandidate> BallFinder::findBallCandidates(Point2f p) {
+  int xDiff, yDiff;
+  ballCandidate first;
+  first.lastPosition = p;
+  first.xDiff = 0;
+  first.yDiff = 0;
+  vector<Point2f> isolatedPoints;
+  vector<ballCandidate> currentBallCandidates;
+  vector<ballCandidate> nextBallCandidates;
+  currentBallCandidates.push_back(first);
+  for (int i = numberOfFrames - 2; i >= 0; --i) {
+    isolatedPoints = setsOfIsolatedPoints[i];
+    for (Point2f next : isolatedPoints) {
+      for (ballCandidate prev : currentBallCandidates) {
+        // check if next maches the path of prev
+        if (norm(prev.lastPosition - next) < maxDistanceBetweenFrames 
+                && norm(prev.lastPosition - next) > minDistanceBetweenFrames) {
+          //cout << next << " matched!" << endl;
+          if ((prev.xDiff < eps && prev.yDiff < eps) || matchesCurrentPath(prev, next, 1)) { 
+            ballCandidate c;
+            c.xDiff = next.x - prev.lastPosition.x;
+            c.yDiff = next.y - prev.lastPosition.y;
+            c.lastPosition = next;
+            nextBallCandidates.push_back(c);
+          } 
+        }
+      }
+    }
+    if (nextBallCandidates.size() == 0) return nextBallCandidates;
+    currentBallCandidates = nextBallCandidates;
+    nextBallCandidates.clear();
+  }
+  return currentBallCandidates;
+}
+
 bool BallFinder::hasRightTrajectory(Point2f p) {
   //cout << "check point " << p << endl;
   double xdiff = 0;
@@ -159,21 +194,7 @@ vector<Point2f> BallFinder::getIsolatedPoints(vector<vector<Point> > contours, v
   return isolatedPoints;
 }
 
-bool BallFinder::addFrame(const cv::Mat &frame, cv::Point2f &ballpos) {
-  vector< vector<Point> > contours;
-
-  updateFrames(frame);
-
-  //update the background model
-  pMOG2.operator()(frame, fgMask, 0.01);
-
-  // do an opening (erosion and dilation) on the mask
-  erode(fgMask, fgMask, Mat());
-  dilate(fgMask, fgMask, Mat()); 
-
-  findContours(fgMask,  contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
-  drawContours(frame, contours, -1, cv::Scalar(0, 0, 255), 0.1);
-
+bool BallFinder::findBall(vector< vector<Point> > &contours, Point2f &ballpos) {
   vector<Point2f> centres = getCentres(contours);
 
   // check for isolated points
@@ -201,25 +222,35 @@ bool BallFinder::addFrame(const cv::Mat &frame, cv::Point2f &ballpos) {
     } else {
       ++frameDifference;
     }
-    // what if couldnt retrieve ball?
   } else if (ballCandidates.size() > 1) {
     for (int i = 0; i < ballCandidates.size(); ++i) {
       ballCandidate *candidate = &ballCandidates[i];
       Point2f currentPosition = findCurrentPosition(*candidate, frameDifference);
       if (norm(currentPosition) != 0)
         updateCurrentPosition(candidate, currentPosition, frameDifference);
-      // again what if not found??
+      else { // if not found then remove this ball candidate
+        ballCandidates.erase(ballCandidates.begin() + i);
+        --i; // not sure if this is gonna work (erasing elements from a vector while iterating through it
+      }
     }
   } else {
     // no ball candidates so far
     if (setsOfIsolatedPoints.size() == numberOfFrames) {
       vector<Point2f> startPoints = setsOfIsolatedPoints[numberOfFrames - 1];
+      vector<ballCandidate> candidates;
       for (Point2f p : startPoints) {
+        // new way of doing that
+        candidates = findBallCandidates(p);
+        if (candidates.size() > 0) 
+          ballCandidates.insert(ballCandidates.begin() + ballCandidates.size(), candidates.begin(),
+            candidates.end());
+        /*
         if (hasRightTrajectory(p)) {
           //cout << "right trajectory found!" << endl;
           ballCandidate candidate = recoverBallCandidate(p);
           ballCandidates.push_back(candidate);
         }
+        */
       }
     }
   }
@@ -239,3 +270,113 @@ bool BallFinder::addFrame(const cv::Mat &frame, cv::Point2f &ballpos) {
 
   return found;
 }
+
+void BallFinder::findPlayerCandidates(vector< vector<Point> > &contours) {
+
+}
+
+bool BallFinder::updatePlayerCandidate(person &candidate, vector< vector<Point> > &contours) {
+
+}
+
+void BallFinder::findPlayers(vector< vector<Point> > &contours, vector<person> &players) {
+  if (playerCandidates.size() == 0) 
+    findPlayerCandidates(contours);
+  else {
+    bool modified = false;;
+    for (int i = 0; i < playerCandidates.size(); ++i) {
+      if (!updatePlayerCandidate(playerCandidates[i], contours)) {
+        playerCandidates.erase(playerCandidates.begin() + i);
+        --i;
+        modified = true;
+      }
+    }
+    if (modified) playersConsistency = 0;
+    else if (playerCandidates.size() == 2) ++playersConsistency;
+    if (playersConsistency > playersConsistencyThreshold)
+      players = playerCandidates;
+  }
+}
+
+/* returns true if it found the ball. Also tries to return positions of both players -
+ * if the players vector is nonempty then it found the positions of players */
+bool BallFinder::addFrame(const Mat &frame, Point2f &ballpos, vector<person> &players) {
+  vector< vector<Point> > contours;
+
+  updateFrames(frame);
+
+  //update the background model
+  pMOG2.operator()(frame, fgMask, 0.01);
+
+  // do an opening (erosion and dilation) on the mask
+  erode(fgMask, fgMask, Mat());
+  dilate(fgMask, fgMask, Mat()); 
+
+  findContours(fgMask,  contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+  drawContours(frame, contours, -1, cv::Scalar(0, 0, 255), 0.1);
+
+  findPlayers(contours, players);
+  return findBall(contours, ballpos);
+  
+}
+
+
+int BallFinder::mymain(int argc, char *argv[]) 
+{
+  if (argc < 2) {
+    cerr << "please specify filename" << endl;
+    exit(EXIT_FAILURE);
+  }
+
+  char* filename = argv[1];
+  cout << "filename: " << filename << endl;
+  VideoCapture capture(filename);
+  
+  if (!capture.isOpened()) {
+    cerr << "Unable to open video file " << endl;
+    exit(EXIT_FAILURE);
+  }
+
+  cout << capture.get(CV_CAP_PROP_FPS) << endl;
+
+  cv::Mat frame;
+  bool success = capture.read(frame);
+  capture.read(frame);
+  capture.read(frame);
+  cout << capture.get(CV_CAP_PROP_FRAME_WIDTH) << endl;
+
+  int keyboard = 0;
+  Point2f ballpos;
+
+  while ((char) keyboard != 'q' && keyboard != 27) {
+    if ((char) keyboard == 's') {
+      // skip 10 frames
+      for (int i = 0; i < 10; ++i) {
+        if (capture.read(frame))
+          updateFrames(frame);
+      }
+    }
+    cout << "before" << endl;
+    capture.read(frame);
+    cout << "after" << endl;
+
+    if (!capture.read(frame)) {
+      cerr << "unable to read frame, exiting... " << endl;
+      exit(EXIT_FAILURE);
+    }
+
+    cout << "call add frame" << endl;
+    vector<person> players;
+
+    if (addFrame(frame, ballpos, players)) {
+      cout << "have the ball..." << endl;
+    }
+
+    imshow("Frame", frame);
+    keyboard = waitKey(0);
+  }
+
+  capture.release();
+  
+}
+
