@@ -1,154 +1,241 @@
+#include "ballFinder.h"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
+#include "opencv2/video/background_segm.hpp"
+#include "opencv2/video/tracking.hpp"
 #include <iostream>
+#include <sstream>
 #include <vector>
-#include <stdio.h>
-#include <cmath>
-#include <cstdlib>
-#include "utils.h"
-#include <fstream>
+#include <ctime>
 
-using namespace std;
 using namespace cv;
+using namespace std;
 
-vector<Vec3f> getCircles(Mat img)
-{
-	Mat img_grey(img.clone());
-	// Assure we are working with monochrome images
-	cvtColor(img, img_grey, CV_BGR2GRAY);
+const double eps = 1e-7;
 
-    GaussianBlur(img_grey, img_grey, Size(9, 9), 4, 4);
-	//Sobel(img_grey, img_grey, -1, 1, 0, 3, 1, 0, BORDER_DEFAULT);
-	Canny(img_grey, img_grey, 47, 47, 3);
-	//imshow("Hough Circle Transform 111", img_grey);
-	//waitKey(0);
+void processVideo(char*);
+void writeFrameNumber(Mat, VideoCapture);
 
-	vector<Vec3f> circles;
-
-    // Apply the Hough Transform to find the circles
-    HoughCircles(img_grey, circles, CV_HOUGH_GRADIENT, 1, img_grey.rows/8, 50, 25, 0, 0);
-
-	return circles;
+void BallFinder::updateFrames(const Mat &frame) {
+  frames.insert(frames.begin(), frame.clone());
+  if (frames.size() > numberOfFrames) {
+    frames.pop_back();
+  }
 }
 
-void displayCircles(Mat img, vector<Vec3f> circles)
-{
-	// Draw the circles detected
-	Mat out(img.clone());
-	for (size_t i = 0; i < circles.size(); i++)
-	{
-		Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
-		int radius = cvRound(circles[i][2]);
-		// circle center
-		circle(out, center, 3, Scalar(0, 255, 0), -1, 8, 0);
-		// circle outline
-		circle(out, center, radius, Scalar(0, 0, 255), 3, 8, 0);
-	}
-
-	// Show your results
-	namedWindow("Hough Circle Transform Demo", CV_WINDOW_AUTOSIZE);
-	imshow("Hough Circle Transform 111", out);
-	waitKey(0);
+void BallFinder::updatesetsOfIsolatedPoints(vector<Point2f> isolatedPts) {
+  setsOfIsolatedPoints.insert(setsOfIsolatedPoints.begin(), isolatedPts);
+  if (setsOfIsolatedPoints.size() > numberOfFrames) {
+    setsOfIsolatedPoints.pop_back();
+  }
 }
 
-bool getCirclesVerify(Mat img)
-{
-	vector<Vec3f> circles = getCircles(img);
-	printf("%d\n", circles.size());
-	// Draw the circles detected
-	Mat out(img.clone());
-	for (size_t i = 0; i < circles.size(); i++)
-	{
-		Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
-		int radius = cvRound(circles[i][2]);
-		// circle center
-		circle(out, center, 3, Scalar(0, 255, 0), -1, 8, 0);
-		// circle outline
-		circle(out, center, radius, Scalar(0, 0, 255), 3, 8, 0);
-	}
-
-	// Show your results
-	namedWindow("Hough Circle Transform Demo", CV_WINDOW_AUTOSIZE);
-	imshow("Hough Circle Transform Demo", out);
-	char k = waitKey(0);
-	if (k == 'c')
-	{
-		// Save result
-		imwrite("../TestData/testImg.png", img);
-
-		ofstream fout("C:\\TennisCourt\\TennisCourt\\TestData\\testCircles.txt");
-		cout << circles.size() << endl;
-		fout << circles.size() << endl;
-		//fprintf(cirfile, "%u\n", circles.size());
-		for (size_t i = 0; i < circles.size(); i++)
-		{
-			fout << circles[i][0] << " " << circles[i][1] << " " << circles[i][2] << endl;
-			cout << circles[i][0] << " " << circles[i][1] << " " << circles[i][2] << endl;
-		}
-		fout.close();
-		return true;
-	}
-	return false;
+bool BallFinder::oppositeSigns(double a, double b) {
+  return (a * b < 0);
+//  return (a > 0 && b < 0) || (a < 0 && b > 0);
 }
 
-bool getCirclesTest(Mat *img)
-{
-	*img = imread("../TestData/testImg.png");
-	vector<Vec3f> circles = getCircles(*img);
-	printf("%d\n", (int) circles.size());
+bool BallFinder::isSimilar(double a, double b) {
+  if (abs(a) < 4 && abs(b) < 4) return true;
+  if (oppositeSigns(a, b)) return false;
+  // need something smarter here for the method to work...
+  return abs(b / a) < 1.35 && abs(b / a) > 0.65;
+}
 
-	vector<Vec3f> circles_exp;
-	ifstream fin("C:\\TennisCourt\\TennisCourt\\TestData\\testCircles.txt");
-	size_t cir_no;
-	fin >> cir_no;
-	cout << cir_no << endl;
-	circles_exp.resize(cir_no);
-	for (size_t i = 0; i < circles_exp.size(); i++)
-	{
-		cout << i << " " << circles_exp.size() << endl;
-		fin >> circles_exp[i][0] >> circles_exp[i][1] >> circles_exp[i][2];
-		cout << circles_exp[i][0] << " " << circles_exp[i][1] << " " << circles_exp[i][2] << endl;
-	}
+bool BallFinder::matchesCurrentPath(struct ballCandidate candidate, Point2f point, int frameDifference) {
+  //cout << "check if " << point << " matches.." << endl;
+  Point2f diff = point - candidate.lastPosition;
+  if (!isSimilar(diff.x , frameDifference * candidate.xDiff)) return false;
+  if (!isSimilar(diff.y , frameDifference * candidate.yDiff)) return false;
+  //candidate.xdiff = diff.x;
+  //candidate.ydiff = diff.y;
+  //candidate.lastPosition = point;
+  //cout << "found match: " << point << endl;
+  return true;
+}
 
-	cout << endl;
-	cout << circles.size() << endl;
-	for (size_t i = 0; i < circles.size(); i++)
-	{
-		cout << circles[i][0] << " " << circles[i][1] << " " << circles[i][2] << endl;
-	}
-	cout << endl;
+Point2f BallFinder::findCurrentPosition(ballCandidate candidate, int frameDifference) {
+  for (Point2f p : setsOfIsolatedPoints[0]) {
+    if (matchesCurrentPath(candidate, p, frameDifference)) return p;
+  }
+  return Point2f(0, 0);
+}
 
-	//displayCircles(img, circles);
-	//displayCircles(img, circles_exp);
+void BallFinder::updateCurrentPosition(ballCandidate *candidate, Point2f currentPosition, int frameDifference) {
+  (*candidate).xDiff = (currentPosition.x - (*candidate).lastPosition.x) / frameDifference;
+  (*candidate).yDiff = (currentPosition.y - (*candidate).lastPosition.y) / frameDifference;
+  (*candidate).lastPosition = currentPosition;
+}
 
-	if (circles.size() != circles_exp.size())
-	{
-		return false;
-	}
-	
-	const double eps = 2;
-	for (size_t i = 0; i < circles_exp.size(); ++i)
-	{
-		bool found = false;
-		for (size_t j = 0; j < circles.size(); ++j)
-		{
-			double err = 0.0;
-			for (size_t k = 0; k < 3; ++k)
-			{
-				err += std::min(abs(circles_exp[i][k] - circles[j][k]), abs((circles_exp[i][k] - circles[j][k]) / circles_exp[i][k]));
-			}
-			//cout << i << " " << j << " " << err << endl;
-			if (err < eps)
-			{
-				found = true;
-				break;
-			}
-		}
-		if (!found)
-		{
-			return false;
-		}
-	}
+bool BallFinder::hasRightTrajectory(Point2f p) {
+  //cout << "check point " << p << endl;
+  double xdiff = 0;
+  double ydiff = 0;
+  Point2f cur = p;
+  bool found;
+  for (int i = numberOfFrames - 2; i >= 0; --i) {
+    vector<Point2f> isolatedPoints = setsOfIsolatedPoints[i];
+    found = false;
+    for (Point2f next : isolatedPoints) {
+      if (norm(cur - next) < maxDistanceBetweenFrames && norm(cur - next) > minDistanceBetweenFrames) {
+        //cout << next << " matched!" << endl;
+        if (abs(xdiff) < eps) xdiff = next.x - cur.x;
+        else {
+          if (!isSimilar(next.x - cur.x, xdiff)) return false;
+          xdiff = next.x - cur.x;
+        }
+        if (abs(ydiff) < eps) ydiff = next.y - cur.y;
+        else {
+          if (!isSimilar(next.y - cur.y, ydiff)) return false;
+          ydiff = next.y - cur.y;
+        }
+        cur = next;
+        found = true;
+        break;
+      }
+    }
+    if (!found) return false;
+  }
+  return true;
+}
 
-	return true;
+ballCandidate BallFinder::recoverBallCandidate(Point2f p) {
+  Point2f cur = p;
+  vector<Point2f> isolatedPoints;
+  double xdiff, ydiff;
+  for (int i = numberOfFrames - 2; i >= 0; --i) {
+    isolatedPoints = setsOfIsolatedPoints[i];
+     for (Point2f next : isolatedPoints) {
+       if (norm(cur - next) < maxDistanceBetweenFrames) {
+         xdiff = next.x - cur.x;
+         ydiff = next.y - cur.y;
+         cur = next;
+         break;
+       }
+     }
+  }
+  ballCandidate candidate;
+  candidate.lastPosition = cur;
+  candidate.xDiff = xdiff;
+  candidate.yDiff = ydiff;
+  return candidate;
+}
+
+vector<Point2f> BallFinder::getCentres(vector<vector<Point> > contours) {
+  vector<Point2f> centres;
+  for (vector<Point> contour : contours) {
+      // for each controur take one point 'representing that contour' 
+      Point2f center(0,0);
+      size_t numberOfPoints = contour.size();
+      for (Point point : contour) {
+        center.x += point.x;
+        center.y += point.y;
+      }
+      center.x = center.x / numberOfPoints;
+      center.y = center.y / numberOfPoints;
+      centres.push_back(center);
+      //circle(frame, center, 4, Scalar(0, 255, 0), -1, 8);
+  }
+  return centres;
+}
+
+vector<Point2f> BallFinder::getIsolatedPoints(vector<vector<Point> > contours, vector<Point2f> centres) {
+  vector<Point2f> isolatedPoints;
+  for (size_t i = 0; i < contours.size(); ++i) {
+      Point2f point = centres[i];
+      size_t contourSize = contours[i].size();
+      int j = 0;
+      for (; j < centres.size(); ++j) {
+        if (i != j) {
+          if (norm(point - centres[j]) < 100) {
+            break;
+          }
+        }
+      }
+    if (j == centres.size()) {
+      isolatedPoints.push_back(point);
+    }
+  }
+  return isolatedPoints;
+}
+
+bool BallFinder::addFrame(const cv::Mat &frame, cv::Point2f &ballpos) {
+  vector< vector<Point> > contours;
+
+  updateFrames(frame);
+
+  //update the background model
+  pMOG2.operator()(frame, fgMask, 0.01);
+
+  // do an opening (erosion and dilation) on the mask
+  erode(fgMask, fgMask, Mat());
+  dilate(fgMask, fgMask, Mat()); 
+
+  findContours(fgMask,  contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+  drawContours(frame, contours, -1, cv::Scalar(0, 0, 255), 0.1);
+
+  vector<Point2f> centres = getCentres(contours);
+
+  // check for isolated points
+  vector<Point2f> isolatedPts = getIsolatedPoints(contours, centres);
+  updatesetsOfIsolatedPoints(isolatedPts);
+
+  size_t size = ballCandidates.size();
+  
+  bool found = false;
+  // check ballCandidates...
+  if (ballCandidates.size() == 1) {
+    ballCandidate *candidate = &ballCandidates[0];
+    //cout << "ball at position: " << (*candidate).lastPosition << endl;
+    Point2f currentPosition = findCurrentPosition(*candidate, frameDifference);
+    //cout << "cur pos: " << currentPosition << endl;
+    if (norm(currentPosition) != 0) {
+      //cout << "draw a circle " << endl;
+      ballpos = currentPosition;
+      found = true;
+      updateCurrentPosition(candidate, currentPosition, frameDifference);
+      frameDifference = 1;
+    } else if (frameDifference > 3) {
+      ballCandidates.clear();
+      frameDifference = 1;
+    } else {
+      ++frameDifference;
+    }
+    // what if couldnt retrieve ball?
+  } else if (ballCandidates.size() > 1) {
+    for (int i = 0; i < ballCandidates.size(); ++i) {
+      ballCandidate *candidate = &ballCandidates[i];
+      Point2f currentPosition = findCurrentPosition(*candidate, frameDifference);
+      if (norm(currentPosition) != 0)
+        updateCurrentPosition(candidate, currentPosition, frameDifference);
+      // again what if not found??
+    }
+  } else {
+    // no ball candidates so far
+    if (setsOfIsolatedPoints.size() == numberOfFrames) {
+      vector<Point2f> startPoints = setsOfIsolatedPoints[numberOfFrames - 1];
+      for (Point2f p : startPoints) {
+        if (hasRightTrajectory(p)) {
+          //cout << "right trajectory found!" << endl;
+          ballCandidate candidate = recoverBallCandidate(p);
+          ballCandidates.push_back(candidate);
+        }
+      }
+    }
+  }
+
+  // prepare args for a call to calcOpticalFlow - VERY wrong comment I guess.
+  //vector<uchar> status;
+  //vector<float> err;
+  //TermCriteria termcrit(TermCriteria::COUNT|TermCriteria::EPS, 20, 0.03);
+  //Size subPixWinSize(10,10), winSize(31,31);
+  //vector<Point2f> nextPoints;
+
+
+  //int size1 = centres.size();
+  //int size2 = nextPoints.size();
+
+  //vector<Point2f> ballCandidates;
+
+  return found;
 }
