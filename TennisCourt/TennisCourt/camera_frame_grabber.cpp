@@ -1,4 +1,7 @@
+#ifdef PYLON_INSTALLED
+
 #include "camera_frame_grabber.h"
+
 #include <opencv2/core/core.hpp>
 #include <pylon/PylonIncludes.h>
 #include "utils.h"
@@ -58,3 +61,4 @@ cv::Mat CameraFrameGrabber::getMat() {
 }
 
 //std::mutex CameraFrameGrabber::pylonFactoryLock;
+#endif  // PYLON_INSTALLED

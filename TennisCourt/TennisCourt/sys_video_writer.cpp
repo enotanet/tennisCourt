@@ -10,7 +10,11 @@ SystemVideoWriter::SystemVideoWriter(const std::vector<std::string> &p_outfiles,
 
 std::string SystemVideoWriter::GenerateFilename(size_t v_id) {
   char buf[MAX_FILELENGTH];
+#ifdef WIN32
   sprintf_s(buf, "%s%d.avi", outfiles[v_id], file_id);
+#else
+  sprintf(buf, "%s%d.avi", outfiles[v_id].c_str(), file_id);
+#endif
   return buf;
 }
 

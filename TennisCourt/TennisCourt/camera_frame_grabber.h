@@ -8,10 +8,11 @@
 
 #include "frame_grabber.h"
 #include <opencv2/core/core.hpp>
-#include <pylon/PylonIncludes.h>
-
 #include <mutex>
 #include <thread>
+
+#ifdef PYLON_INSTALLED
+#include <pylon/PylonIncludes.h>
 
 // Behaves differently from grabbing from file.
 // There, we would expect consecutive frames. Here, this behaviour
@@ -35,5 +36,20 @@ private:
   // Lock acquired during construction
   static std::mutex pylonFactoryLock;
 };
+
+#else
+
+class CameraFrameGrabber : public FrameGrabber {
+public:
+  // Might want to add new params for setting camera options.
+  CameraFrameGrabber(int camera_id) {}
+  ~CameraFrameGrabber() {}
+  bool getNextFrame(cv::Mat *res) {
+    return true;
+  }
+  cv::Mat getMat() {
+    return cv::Mat();
+  }
+#endif  // PYLON_INSTALLED
 
 #endif  // CAMERA_FRAME_GRABBER_H__

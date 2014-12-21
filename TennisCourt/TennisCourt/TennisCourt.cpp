@@ -203,6 +203,7 @@ void execute() {
 }
 
 int main(int argc, char *argv[]) {
+  printf("%d\n%d\n", CV_MAJOR_VERSION, CV_MINOR_VERSION);
   ParseArguments(argc, argv);
   if (g_args.count("test") > 0) {
     run_tests();
