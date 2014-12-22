@@ -7,6 +7,7 @@
 #include <sstream>
 #include <vector>
 #include <ctime>
+#include <string>
 
 using namespace cv;
 using namespace std;
@@ -36,17 +37,22 @@ bool BallFinder::oppositeSigns(double a, double b) {
 }
 
 bool BallFinder::isSimilar(double a, double b) {
+  //cout << "in isSimilar..." << endl;
   if (abs(a) < 4 && abs(b) < 4) return true;
   if (oppositeSigns(a, b)) return false;
   // need something smarter here for the method to work...
+  //cout << "check if within bound..." << endl;
   return abs(b / a) < 1.35 && abs(b / a) > 0.65;
 }
 
 bool BallFinder::matchesCurrentPath(struct ballCandidate candidate, Point2f point, int frameDifference) {
   //cout << "check if " << point << " matches.." << endl;
   Point2f diff = point - candidate.lastPosition;
+  //cout << "is xdiff similar? " << endl;
   if (!isSimilar(diff.x , frameDifference * candidate.xDiff)) return false;
+  //cout << "is ydiff sim? " << endl;
   if (!isSimilar(diff.y , frameDifference * candidate.yDiff)) return false;
+  //cout << "both are" << endl;
   //candidate.xdiff = diff.x;
   //candidate.ydiff = diff.y;
   //candidate.lastPosition = point;
@@ -69,7 +75,7 @@ void BallFinder::updateCurrentPosition(ballCandidate *candidate, Point2f current
 
 vector<ballCandidate> BallFinder::findBallCandidates(Point2f p) {
   //int xDiff, yDiff;
-  cout << "in findBallCandidates with point" << p << endl;
+  //cout << "in findBallCandidates with point" << p << endl;
   ballCandidate first;
   first.lastPosition = p;
   first.xDiff = 0;
@@ -81,14 +87,14 @@ vector<ballCandidate> BallFinder::findBallCandidates(Point2f p) {
   for (int i = numberOfFrames - 2; i >= 0; --i) {
     isolatedPoints = setsOfIsolatedPoints[i];
     for (Point2f next : isolatedPoints) {
-      cout << "check " << next << endl;
+      //cout << "check " << next << endl;
       for (ballCandidate prev : currentBallCandidates) {
         // check if next maches the path of prev
         if (norm(prev.lastPosition - next) < maxDistanceBetweenFrames 
                 && norm(prev.lastPosition - next) > minDistanceBetweenFrames) {
           //cout << next << " matched!" << endl;
           if ((prev.xDiff < eps && prev.yDiff < eps) || matchesCurrentPath(prev, next, 1)) { 
-            cout << "match" << endl;
+            //cout << "match" << endl;
             ballCandidate c;
             c.xDiff = next.x - prev.lastPosition.x;
             c.yDiff = next.y - prev.lastPosition.y;
@@ -99,7 +105,7 @@ vector<ballCandidate> BallFinder::findBallCandidates(Point2f p) {
       }
     }
     if (nextBallCandidates.size() == 0) {
-      cout << "early returnn" <<endl;
+      //cout << "early returnn" <<endl;
       return nextBallCandidates;
     }
     currentBallCandidates = nextBallCandidates;
@@ -162,8 +168,9 @@ ballCandidate BallFinder::recoverBallCandidate(Point2f p) {
   return candidate;
 }
 
-vector<Point2f> BallFinder::getCentres(vector<vector<Point> > contours) {
+vector<Point2f> BallFinder::getCentres() {
   vector<Point2f> centres;
+  int i = 1;
   for (vector<Point> contour : contours) {
       // for each controur take one point 'representing that contour' 
       Point2f center(0,0);
@@ -175,6 +182,8 @@ vector<Point2f> BallFinder::getCentres(vector<vector<Point> > contours) {
       center.x = center.x / numberOfPoints;
       center.y = center.y / numberOfPoints;
       centres.push_back(center);
+      putText(frame, std::to_string(i), center, FONT_HERSHEY_SIMPLEX, 0.3, Scalar(0, 255, 0),1,8,false );
+      ++i;
       //circle(frame, center, 4, Scalar(0, 255, 0), -1, 8);
   }
   return centres;
@@ -182,7 +191,7 @@ vector<Point2f> BallFinder::getCentres(vector<vector<Point> > contours) {
 
 
 /* return centres of small, isolated contours (expect such a contour to be a ball) */
-vector<Point2f> BallFinder::getIsolatedPoints(vector<vector<Point> > contours, vector<Point2f> centres) {
+vector<Point2f> BallFinder::getIsolatedPoints() {
   vector<Point2f> isolatedPoints;
   //vector<vector<Point> > isolatedContours;
   vector<bool> notIsolated;
@@ -192,7 +201,7 @@ vector<Point2f> BallFinder::getIsolatedPoints(vector<vector<Point> > contours, v
   for (i = 0; i < contours.size(); ++i) {
     if (notIsolated[i]) continue;
     for (j = 0; j < contours.size(); ++j) {
-      if (i != j && lowDistanceBetweenContours(contours[i], contours[j])) {
+      if (i != j && lowDistanceBetweenContours(i, j)) {
         notIsolated[i] = true;
         notIsolated[j] = true;
         break;
@@ -211,24 +220,29 @@ vector<Point2f> BallFinder::getIsolatedPoints(vector<vector<Point> > contours, v
   return isolatedPoints;
 }
 
-int BallFinder::lowDistanceBetweenContours(vector<Point> c1, vector<Point> c2) {
-  vector<Point> rep1 = getRepresentatives(c1);
-  vector<Point> rep2 = getRepresentatives(c2);
+int BallFinder::lowDistanceBetweenContours(int i, int j) {
+  vector<Point> rep1 = representatives[i];
+  vector<Point> rep2 = representatives[j];
   for (Point p1 : rep1) 
     for (Point p2 : rep2) 
       if (norm(p1 - p2) < isolationThreshold) return true;
   return false;
 }
 
-vector<Point> BallFinder::getRepresentatives(vector<Point> contour) {
-  int i = 0;
-  vector<Point> result;
-  while (i < contour.size()) {
-    result.push_back(contour[i]);
-    circle(frame, contour[i], 1, Scalar(255,0,0), -1, 8);
-    i += representativeFrequency;
+vector< vector<Point> > BallFinder::getRepresentatives() {
+  vector< vector<Point> > representatives;
+  vector<Point> cur;
+  for (int i = 0; i < contours.size(); ++i) {
+    int j = 0;
+    while (j < contours[i].size()) {
+      cur.push_back(contours[i][j]);
+      circle(frame, contours[i][j], 1, Scalar(255,0,0), -1, 8);
+      j += representativeFrequency;
+    }
+    representatives.push_back(cur);
+    cur.clear();
   }
-  return result;
+  return representatives;
 }
 
 void BallFinder::printContour(vector<Point> contour) {
@@ -236,25 +250,19 @@ void BallFinder::printContour(vector<Point> contour) {
   cout << endl;
 }
 
-bool BallFinder::findBall(vector< vector<Point> > &contours, Point2f &ballpos) {
-  vector<Point2f> centres = getCentres(contours);
-
-  // check for isolated points
-  vector<Point2f> isolatedPts = getIsolatedPoints(contours, centres);
-  updatesetsOfIsolatedPoints(isolatedPts);
-
+bool BallFinder::findBall(Point2f &ballpos) {
   size_t size = ballCandidates.size();
   
   bool found = false;
   // check ballCandidates...
   if (ballCandidates.size() == 1) {
-    cout << "one ball candidate" << endl;
+    //cout << "one ball candidate" << endl;
     ballCandidate *candidate = &ballCandidates[0];
-    cout << "at position: " << (*candidate).lastPosition << endl;
+    //cout << "at position: " << (*candidate).lastPosition << endl;
     Point2f currentPosition = findCurrentPosition(*candidate, frameDifference);
     //cout << "cur pos: " << currentPosition << endl;
     if (norm(currentPosition) != 0) {
-      cout << "current position found" << endl;
+      //cout << "current position found" << endl;
       circle(frame, currentPosition, 4, Scalar(255,0,0), -1, 8);
       ballpos = currentPosition;
       found = true;
@@ -267,7 +275,7 @@ bool BallFinder::findBall(vector< vector<Point> > &contours, Point2f &ballpos) {
       ++frameDifference;
     }
   } else if (ballCandidates.size() > 1) {
-    cout << "multiple ball candidates" << endl;
+    //cout << "multiple ball candidates" << endl;
     for (int i = 0; i < ballCandidates.size(); ++i) {
       ballCandidate *candidate = &ballCandidates[i];
       Point2f currentPosition = findCurrentPosition(*candidate, frameDifference);
@@ -281,7 +289,7 @@ bool BallFinder::findBall(vector< vector<Point> > &contours, Point2f &ballpos) {
   } else {
     // no ball candidates so far
     if (setsOfIsolatedPoints.size() == numberOfFrames) {
-      cout << "look for ball candidates" << endl;
+      //cout << "look for ball candidates" << endl;
       vector<Point2f> startPoints = setsOfIsolatedPoints[numberOfFrames - 1];
       vector<ballCandidate> candidates;
       for (Point2f p : startPoints) {
@@ -317,22 +325,74 @@ bool BallFinder::findBall(vector< vector<Point> > &contours, Point2f &ballpos) {
   return found;
 }
 
-void BallFinder::findPlayerCandidates(vector< vector<Point> > &contours) {
-
+bool BallFinder::isClose(object &obj, Point2f &p) {
+  return isInside(obj, p) || isNearby(obj, p);
 }
 
-bool BallFinder::updatePlayerCandidate(person &candidate, vector< vector<Point> > &contours) {
+bool BallFinder::isNearby(object &obj, Point2f &p) {
+  return norm(obj.top - p) <= 2 * isolationThreshold ||
+         norm(obj.bottom - p) <= 2 * isolationThreshold ||
+         norm(obj.right - p) <= 2 * isolationThreshold ||
+         norm(obj.left - p) <= 2 * isolationThreshold; 
+}
+
+bool BallFinder::isInside(object &obj, Point2f &p) {
+  return p.x <= obj.right.x && p.x >= obj.left.x &&
+         p.y >= obj.top.y && p.y <= obj.bottom.y;
+}
+
+void BallFinder::updateObject(object &obj, Point2f &p) {
+  if (obj.top.y > p.y) obj.top = p;
+  if (obj.bottom.y < p.y) obj.bottom = p;
+  if (obj.right.x < p.x) obj.right = p;
+  if (obj.left.x > p.x) obj.left = p;
+}
+
+/* try to find a lot of contours close to each other or big contours */
+vector<object> BallFinder::findPlayerCandidates() {
+  vector<object> result;
+  object cur;
+  //maxRight = maxLeft = maxTop = maxBottom = 0;
+  int size = 0;
+  int i = 0;
+  //vector< vector<Point> >::iterator it = contours.begin();
+  while (i < contours.size()) {
+    if (size == 0) { 
+      //cur.right = cur.left = centres[i].x;
+      //cur.top = cur.bottom = centres[i].y;
+      cur.top = cur.bottom = cur.right = cur.left = centres[i];
+      ++size;
+      ++i;
+    } else if (isClose(cur, centres[i])) {
+      updateObject(cur, centres[i]);
+      ++size;
+      ++i;
+    } else {
+      if (size >= minPlayerSize) {
+        cout << "found player candidate!" << endl;
+        result.push_back(cur);
+      }
+      //cout << "size: " << size << endl;
+      size = 0;
+    }
+  }
+  cout << "num of player candidates: " << result.size() << endl;
+  return result;
+}
+
+bool BallFinder::updatePlayerCandidate(object &candidate) {
   return false;
 }
 
-void BallFinder::findPlayers(vector< vector<Point> > &contours, vector<person> &players) {
-  return;
+void BallFinder::findPlayers(vector<object> &players) {
+  players = findPlayerCandidates();
+  /*
   if (playerCandidates.size() == 0) 
-    findPlayerCandidates(contours);
+    findPlayerCandidates();
   else {
-    bool modified = false;;
+    bool modified = false;
     for (int i = 0; i < playerCandidates.size(); ++i) {
-      if (!updatePlayerCandidate(playerCandidates[i], contours)) {
+      if (!updatePlayerCandidate(playerCandidates[i])) {
         playerCandidates.erase(playerCandidates.begin() + i);
         --i;
         modified = true;
@@ -343,13 +403,12 @@ void BallFinder::findPlayers(vector< vector<Point> > &contours, vector<person> &
     if (playersConsistency > playersConsistencyThreshold)
       players = playerCandidates;
   }
+  */
 }
 
 /* returns true if it found the ball. Also tries to return positions of both players -
  * if the players vector is nonempty then it found the positions of players */
-bool BallFinder::addFrame(const Mat &frame, Point2f &ballpos, vector<person> &players) {
-  vector< vector<Point> > contours;
-
+bool BallFinder::addFrame(const Mat &frame, Point2f &ballpos, vector<object> &players) {
   updateFrames(frame);
 
   //update the background model
@@ -359,12 +418,40 @@ bool BallFinder::addFrame(const Mat &frame, Point2f &ballpos, vector<person> &pl
   erode(fgMask, fgMask, Mat());
   dilate(fgMask, fgMask, Mat()); 
 
-  findContours(fgMask,  contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE); 
+  findContours(fgMask, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE); 
   drawContours(frame, contours, -1, cv::Scalar(0, 0, 255), 0.1);
 
-  findPlayers(contours, players);
-  return findBall(contours, ballpos);
+  representatives = getRepresentatives();
+  centres = getCentres();
+  vector<Point2f> isolatedPts = getIsolatedPoints();
+  updatesetsOfIsolatedPoints(isolatedPts);
   
+  /*
+  Mat dst, detected_edges;
+
+  int edgeThresh = 1;
+  int lowThreshold = 10;
+  int ratio = 3;
+  int kernel_size = 3;
+  const char* window_name = "Edge Map";
+
+  dst.create( frame.size(), frame.type() );
+
+  /// Reduce noise with a kernel 3x3
+  blur( frame, detected_edges, Size(3,3) );
+  
+  /// Canny detector
+  Canny( detected_edges, detected_edges, lowThreshold, lowThreshold*ratio, kernel_size );
+  
+  /// Using Canny's output as a mask, we display our result
+  dst = Scalar::all(0);
+  
+  frame.copyTo( dst, detected_edges);
+  imshow( window_name, dst );
+  */
+
+  findPlayers(players);
+  return findBall(ballpos);
 }
 
 
@@ -407,7 +494,7 @@ int BallFinder::mymain(int argc, char *argv[])
       exit(EXIT_FAILURE);
     }
 
-    vector<person> players;
+    vector<object> players;
     Point2f ballpos;
 
     if (addFrame(frame, ballpos, players)) {
