@@ -244,6 +244,7 @@ void BallFinder::printContour(vector<Point> contour) {
 }
 
 bool BallFinder::findBall(Point2f &ballpos) {
+  line(frame, Point(100,100), Point(100,200),Scalar(0,0,255),1,8,0);
   size_t size = ballCandidates.size();
   bool found = false;
 
@@ -318,9 +319,9 @@ void BallFinder::printObject(object &obj) {
 }
 
 bool BallFinder::isClose(object &obj, Point2f &p) {
-  cout << "have object ";
-  printObject(obj);
-  cout << " chec if " << p << " is close to that object" << endl;
+  //cout << "have object ";
+  //printObject(obj);
+  //cout << " chec if " << p << " is close to that object" << endl;
   return isInside(obj, p) || isNearby(obj, p);
 }
 
@@ -329,14 +330,20 @@ bool BallFinder::isNearby(object &obj, Point2f &p) {
   //       norm(obj.bottom - p) <= playerHeight ||
   //       norm(obj.right - p) <= playerWidth ||
   //       norm(obj.left - p) <= playerWidth; 
-  cout << "length " << norm(Point2f(obj.right.x, obj.top.y) - p)  << endl;
-  cout << "length " << norm(Point2f(obj.right.x, obj.bottom.y) - p) << endl;
-  cout << "length " << norm(Point2f(obj.left.x, obj.bottom.y) - p) << endl;
-  cout << "length " << norm(Point2f(obj.left.x, obj.top.y) - p) << endl;
-  return norm(Point2f(obj.right.x, obj.top.y) - p) <= playerLength &&
-         norm(Point2f(obj.right.x, obj.bottom.y) - p) <= playerLength &&
-         norm(Point2f(obj.left.x, obj.bottom.y) - p) <= playerLength &&
-         norm(Point2f(obj.left.x, obj.top.y) - p) <= playerLength ; 
+  //cout << "length " << norm(Point2f(obj.right.x, obj.top.y) - p)  << endl;
+  //cout << "length " << norm(Point2f(obj.right.x, obj.bottom.y) - p) << endl;
+  //cout << "length " << norm(Point2f(obj.left.x, obj.bottom.y) - p) << endl;
+  //cout << "length " << norm(Point2f(obj.left.x, obj.top.y) - p) << endl;
+  float yratio = obj.centre.y / 900;
+  //cout << "yratio " << yratio << endl;
+  float xratio = abs(obj.centre.x - 640) / 1280;
+  //cout << "xratio " << xratio << endl;
+  float ratio = sqrt(yratio) * yratio * yratio - xratio * xratio * xratio * xratio;
+  //cout << "length: " << ratio * playerLength << endl;
+  return norm(Point2f(obj.right.x, obj.top.y) - p) <= ratio * playerLength &&
+         norm(Point2f(obj.right.x, obj.bottom.y) - p) <= ratio * playerLength &&
+         norm(Point2f(obj.left.x, obj.bottom.y) - p) <= ratio * playerLength &&
+         norm(Point2f(obj.left.x, obj.top.y) - p) <= ratio * playerLength; 
   //cout << "length " << abs(obj.right.x - p.x) << endl;
   //cout << "length " << abs(obj.left.x - p.x) << endl;
   //cout << "length " << abs(obj.top.y - p.y) << endl; 
@@ -353,11 +360,12 @@ bool BallFinder::isInside(object &obj, Point2f &p) {
 }
 
 void BallFinder::updateObject(object &obj, int i) {
+  bool needToInit = obj.madeUpOf.size() == 0;
   // check if the new point is a 'radical' point
-  if (obj.top.y > centres[i].y) obj.top = centres[i];
-  if (obj.bottom.y < centres[i].y) obj.bottom = centres[i];
-  if (obj.right.x < centres[i].x) obj.right = centres[i];
-  if (obj.left.x > centres[i].x) obj.left = centres[i];
+  if (obj.top.y > centres[i].y || needToInit) obj.top = centres[i];
+  if (obj.bottom.y < centres[i].y || needToInit) obj.bottom = centres[i];
+  if (obj.right.x < centres[i].x || needToInit) obj.right = centres[i];
+  if (obj.left.x > centres[i].x || needToInit) obj.left = centres[i];
   // update the center
   obj.centre.x = obj.madeUpOf.size() * obj.centre.x + centres[i].x;
   obj.centre.x /= obj.madeUpOf.size() + 1;
@@ -377,30 +385,23 @@ vector<object> BallFinder::findPlayerCandidates() {
   while (i < contours.size()) {
     if (!notIsolated[i]) {
       ++i;
-    } else if (size == 0) { 
-      //cur.right = cur.left = centres[i].x;
-      //cur.top = cur.bottom = centres[i].y;
-      cur.top = cur.bottom = cur.right = cur.left = centres[i];
-      ++size;
-      ++i;
-    } else if (isClose(cur, centres[i])) {
-      cout << "it is close " << endl;
+    } else if (size == 0 || isClose(cur, centres[i])) { 
       updateObject(cur, i);
       ++size;
       ++i;
     } else {
-      cout << "is not close" << endl;
+      //cout << "is not close" << endl;
       if (size >= minNumberOfContoursRepresentingPlayer) {
-        cout << "found player candidate!" << endl;
+        //cout << "found player candidate!" << endl;
         result.push_back(cur);
       }
-      cout << "size: " << size << endl;
+      //cout << "size: " << size << endl;
       size = 0;
     }
   }
   if (size >= minNumberOfContoursRepresentingPlayer) 
     result.push_back(cur);
-  cout << "num of player candidates: " << result.size() << endl;
+  //cout << "num of player candidates: " << result.size() << endl;
   return result;
 }
 
@@ -411,10 +412,11 @@ bool BallFinder::updatePlayerCandidate(object &candidate) {
 void BallFinder::findPlayers(vector<object> &players) {
   players = findPlayerCandidates();
   for (object player : players) {
-    float x = (player.top.x + player.bottom.x + player.left.x + player.right.x) / 4;
-    float y = (player.top.y + player.bottom.y + player.left.y + player.right.y) / 4;
-    circle(frame, Point2f(x, y), 4, Scalar(0, 255, 0), -1, 8);
+    //float x = (player.top.x + player.bottom.x + player.left.x + player.right.x) / 4;
+    //float y = (player.top.y + player.bottom.y + player.left.y + player.right.y) / 4;
+    //circle(frame, Point2f(x, y), 4, Scalar(0, 255, 0), -1, 8);
     circle(frame, player.centre, 4, Scalar(100, 100, 100), -1, 8);
+    //cout << "centre " << player.centre << endl;
   }
 
   /*
@@ -481,7 +483,8 @@ bool BallFinder::addFrame(const Mat &frame, Point2f &ballpos, vector<object> &pl
   imshow( window_name, dst );
   */
 
-  //findPlayers(players);
+  findPlayers(players);
+  //return true;
   return findBall(ballpos);
 }
 
@@ -501,6 +504,9 @@ int BallFinder::mymain(int argc, char *argv[])
     cerr << "Unable to open video file " << endl;
     exit(EXIT_FAILURE);
   }
+
+  cout << capture.get(CV_CAP_PROP_FRAME_WIDTH) << endl;
+  cout << capture.get(CV_CAP_PROP_FRAME_HEIGHT) << endl;
 
   int keyboard = 0;
   int k = 0;
