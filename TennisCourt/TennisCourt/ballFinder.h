@@ -18,6 +18,8 @@ struct person {
 
 struct object {
   cv::Point2f top, bottom, right, left;
+  std::vector<int> madeUpOf;
+  cv::Point2f centre;
 };
 
 // Might be refactored into general object detector. Or some
@@ -53,22 +55,29 @@ private:
   bool isClose(object&, cv::Point2f&);
   bool isInside(object&, cv::Point2f&);
   bool isNearby(object&, cv::Point2f&);
-  void updateObject(object&, cv::Point2f&);
+  void updateObject(object&, int);
+  void printObject(object&);
+  void sortContours();
 
   std::vector<cv::Mat> frames; // will contain last 'numberOfFrames' frames
   std::vector< std::vector<cv::Point2f> > setsOfIsolatedPoints;
   std::vector< std::vector<cv::Point> > contours;
   std::vector< std::vector<cv::Point> > representatives;
+  std::vector<bool> notIsolated; 
   std::vector<cv::Point2f> centres;
   static const int numberOfFrames = 4; // must be at least 2 (recommended at least 3)
   static const int maxCoordinateDiff = 40;
-  static const int maxDistanceBetweenFrames = 50;
+  static const int maxDistanceBetweenFrames = 50; // max/min distance the ball has traveled
   static const int minDistanceBetweenFrames = 2;
-  static const int playersConsistencyThreshold = 4;
-  static const int isolationThreshold = 35;
-  static const int representativeFrequency = 15;
-  static const int ballContourSizeThreshold = 40;
-  static const int minPlayerSize = 10;
+  //static const int playersConsistencyThreshold = 4;
+  static const int isolationThreshold = 35; //if no contour is that close then the contour is isolated
+  static const int representativeFrequency = 15; // pixel distance between two consecutive 
+                                                 // representative points of a given contour
+  static const int ballContourSizeThreshold = 40; // maximal size of a ball contour
+  static const int minNumberOfContoursRepresentingPlayer = 10;
+  static const int playerHeight = 210; // average player height in pixels
+  static const int playerWidth = 120; // average player width in pixels
+  static const int playerLength = 260;  
   std::vector<struct ballCandidate> ballCandidates;
   std::vector<struct object> playerCandidates;
 
