@@ -77,7 +77,7 @@ private:
   static const int minNumberOfContoursRepresentingPlayer = 10;
   static const int playerHeight = 210; // average player height in pixels
   static const int playerWidth = 120; // average player width in pixels
-  static const int playerLength = 260;  
+  static const int playerLength = 400;  
   std::vector<struct ballCandidate> ballCandidates;
   std::vector<struct object> playerCandidates;
 
