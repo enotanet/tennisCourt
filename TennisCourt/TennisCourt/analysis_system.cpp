@@ -57,7 +57,7 @@ void InitialiseOutput(size_t windowCount) {
   for (size_t i = 0; i < windowCount; ++i) {
     char name[32];
     sprintf(name, "Window %d", i);
-    cv::namedWindow(name, CV_WINDOW_AUTOSIZE);
+    cv::namedWindow(name, CV_WINDOW_NORMAL);
   }
 }
 

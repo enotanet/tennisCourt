@@ -23,7 +23,7 @@ bool CourtDisplay::display(cv::Point2d ball, std::vector<cv::Point2d> players, c
 }
 
 void CourtDisplay::calibrate() {
-  cv::namedWindow("Calibrate Court", CV_WINDOW_AUTOSIZE);
+  cv::namedWindow("Calibrate Court", CV_WINDOW_NORMAL);
   std::vector<cv::Point2d> corners;
   corners.push_back(cv::Point2d(-39.0 * k_foot, 18 * k_foot));
   corners.push_back(cv::Point2d(39.0 * k_foot, 18 * k_foot));

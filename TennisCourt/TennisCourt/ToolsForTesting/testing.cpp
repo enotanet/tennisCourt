@@ -9,13 +9,36 @@
 #include "../sys_video_writer.h"
 #include "../utils.h"
 
-#include <ctime>
 #include <cassert>
+#include <ctime>
 #include <memory>
+#include <vector>
+#include <opencv2/core/core.hpp>
 
 void run_tests() {
   INFO("Running tests!");
-  if (g_args.count("court_calibrate")) {
+  if (g_args["test"].size() && g_args["test"][0] == "line") {
+    std::vector<cv::Point3d> points;
+    points.push_back(cv::Point3d(0, 0, 0));
+    points.push_back(cv::Point3d(1, 0, 0));
+    points.push_back(cv::Point3d(0, 1, 0));
+    points.push_back(cv::Point3d(0, 0, 1));
+    points.push_back(cv::Point3d(0, 1, 1));
+    points.push_back(cv::Point3d(1, 0, 1));
+    points.push_back(cv::Point3d(1, 1, 0));
+    points.push_back(cv::Point3d(1, 1, 1));
+    for (size_t i = 0; i < points.size(); ++i) {
+      for (size_t j = 0; j < points.size(); ++j) {
+        for (size_t k = 0; k < points.size(); ++k) {
+          for (size_t l = 0; l < points.size(); ++l) {
+            cv::Point3d res = LineIntersect(points[i], points[j], points[k], points[l]);
+            INFO("Intersection of lines: " << points[i] << " " << points[j] <<
+                 " ; " << points[k] << " " << points[l] << " -> " << res);
+          }
+        }
+      }
+    }
+  } else if (g_args.count("court_calibrate")) {
     INFO("Running court calibration");
     CourtDisplay displ(g_args["court_calibrate"][0]);
     displ.calibrate();
