@@ -2,6 +2,7 @@
 //
 
 #include "testing.h"
+#include "../court_display.h"
 #include "../sys_frame_grabber.h"
 #include "../sys_camera_grabber.h"
 #include "../sys_file_frame_grabber.h"
@@ -14,7 +15,11 @@
 
 void run_tests() {
   INFO("Running tests!");
-  if (g_args.count("fout")) {
+  if (g_args.count("court_calibrate")) {
+    INFO("Running court calibration");
+    CourtDisplay displ(g_args["court_calibrate"][0]);
+    displ.calibrate();
+  } else if (g_args.count("fout")) {
     INFO("Testing reading and writing of video");
     SystemFrameGrabber *grabber;
     if (g_args.count("fin")) {

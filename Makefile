@@ -5,8 +5,10 @@ SOURCE_DIR = TennisCourt/TennisCourt
 OBJ_DIR = obj
 CPP_FILES = $(wildcard TennisCourt/TennisCourt/*.cpp)
 CPP_TEST = $(wildcard TennisCourt/TennisCourt/ToolsForTesting/*.cpp)
+CPP_CVUTILS = $(wildcard TennisCourt/TennisCourt/CV_Utils/*.cpp)
 OBJ_FILES = $(addprefix obj/,$(notdir $(CPP_FILES:.cpp=.o)))
 OBJ_TEST_FILES = $(addprefix obj/test/,$(notdir $(CPP_TEST:.cpp=.o)))
+OBJ_TESTUTILS = $(addprefix obj/utils/,$(notdir $(CPP_CVUTILS:.cpp=.o)))
 
 # all: tennis.o ballFinder.o filegrabber.o videowrite.o
 # 	$(CC) -o binary tennis.o ballFinder.o filegrabber.o videowrite.o $(LIBS)
@@ -21,11 +23,13 @@ OBJ_TEST_FILES = $(addprefix obj/test/,$(notdir $(CPP_TEST:.cpp=.o)))
 # simple: simple.cpp
 # 	$(CC) $(CFLAGS) -c -o simple.o simple.cpp
 
-all: $(OBJ_FILES) $(OBJ_TEST_FILES)
+all: $(OBJ_FILES) $(OBJ_TEST_FILES) $(OBJ_TESTUTILS)
 	$(CC) -o binary $^ $(LIBS)
 $(OBJ_DIR)/%.o: $(SOURCE_DIR)/%.cpp
 	$(CC) $(CFLAGS) -c -o $@ $<
 obj/test/%.o: $(SOURCE_DIR)/ToolsForTesting/%.cpp
 	$(CC) $(CFLAGS) -c -o $@ $<
+obj/utils/%.o: $(SOURCE_DIR)/CV_Utils/%.cpp
+	$(CC) $(CFLAGS) -c -o $@ $<
 clean:
-	rm -rf $(OBJ_DIR)/*.o binary $(OBJ_DIR)/test/*.o
+	rm -rf $(OBJ_DIR)/*.o binary $(OBJ_DIR)/test/*.o $(OBJ_DIR)/utils/*.o
