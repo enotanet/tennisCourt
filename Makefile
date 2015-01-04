@@ -1,6 +1,6 @@
 CFLAGS = `pkg-config --cflags opencv`
 LIBS = `pkg-config --libs opencv`
-CC = g++ -std=c++11 -g
+CC = g++ -std=c++11 -g -Wall
 SOURCE_DIR = TennisCourt/TennisCourt
 OBJ_DIR = obj
 CPP_FILES = $(wildcard TennisCourt/TennisCourt/*.cpp)

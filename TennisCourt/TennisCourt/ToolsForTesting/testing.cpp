@@ -10,6 +10,7 @@
 #include "../utils.h"
 
 #include <cassert>
+#include <cmath>
 #include <ctime>
 #include <memory>
 #include <vector>
@@ -37,6 +38,36 @@ void run_tests() {
           }
         }
       }
+    }
+  } else if (g_args["test"].size() && g_args["test"][0] == "pparab") {
+    std::vector<cv::Point2d> points;
+    points.push_back(cv::Point2d(0, 0));
+    points.push_back(cv::Point2d(5, 0));
+    points.push_back(cv::Point2d(0, 5));
+    points.push_back(cv::Point2d(5, 5));
+
+    std::vector<cv::Point3d> parab;
+    parab.push_back(cv::Point3d(1, 0, 0));
+    parab.push_back(cv::Point3d(1, 2, 1));
+    for (cv::Point2d p : points) {
+      for (cv::Point3d q : parab) {
+        double d = PointToParabolaDistance(p, q.x, q.y, q.z);
+        INFO("Point to parab distance " << p << " ; " << q << " -> " << d);
+      }
+    }
+  } else if (g_args["test"].size() && g_args["test"][0] == "gpard") {
+    std::vector<cv::Point2d> points;
+    points.push_back(cv::Point2d(0, 0));
+    points.push_back(cv::Point2d(3, 3));
+    points.push_back(cv::Point2d(8, 0));
+    double a, b, c;
+    getParabola(points, &a, &b, &c);
+    DEBUG("Parabola defined by " << points[0] << " ; " << points[1] << " ; " << points[2]);
+    DEBUG("Parabola equation " << a << " " << b << " " << c);
+    for (auto p : points) {
+      double trajectory_dist = PointToParabolaDistance(p, a, b, c);
+      DEBUG("Dist " << p << " -> " << trajectory_dist);
+      assert(std::abs(trajectory_dist) < 1);
     }
   } else if (g_args.count("court_calibrate")) {
     INFO("Running court calibration");

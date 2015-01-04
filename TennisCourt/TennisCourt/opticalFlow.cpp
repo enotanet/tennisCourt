@@ -170,7 +170,6 @@ vector<Point2f> getIsolatedPoints(vector<vector<Point> > contours, vector<Point2
   vector<Point2f> isolatedPoints;
   for (size_t i = 0; i < contours.size(); ++i) {
       Point2f point = centres[i];
-      size_t contourSize = contours[i].size();
       size_t j = 0;
       for (; j < centres.size(); ++j) {
         if (i != j) {
@@ -257,8 +256,6 @@ void processVideo(char* videoFilename) {
     vector<Point2f> isolatedPts = getIsolatedPoints(contours, centres);
     updatesetsOfIsolatedPoints(isolatedPts);
 
-    size_t size = ballCandidates.size();
-    
     //cout << "frame diff: " << frameDifference << endl;
 
     // check ballCandidates...
@@ -306,9 +303,9 @@ void processVideo(char* videoFilename) {
 
     for (int i = 0; i < setsOfIsolatedPoints.size(); ++i) {
       vector<Point2f> points = setsOfIsolatedPoints[i];
-      for (Point2f p : points) {
+      //for (Point2f p : points) {
         //cout << p << ", ";
-      }
+      //}
       //cout << endl;
     }
 
@@ -326,10 +323,6 @@ void processVideo(char* videoFilename) {
 
     //calcOpticalFlowPyrLK(prevFrame, frame, pointsToTrack, nextPoints, status, err, winSize, 3, termcrit, 0, 0.001);
    
-
-    size_t size1 = centres.size();
-    size_t size2 = nextPoints.size();
-
     vector<Point2f> ballCandidates;
 
     /*for (int i = 0; i < pointsToTrack.size(); ++i) {
