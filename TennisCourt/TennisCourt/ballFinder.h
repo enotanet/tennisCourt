@@ -26,7 +26,7 @@ struct object {
 // common code from ball & person detector.
 class BallFinder {
 public:
-  BallFinder() : frameDifference(-1), playersConsistency(0) {}
+  BallFinder() : playersConsistency(0), frameDifference(-1) {}
   bool addFrame(const cv::Mat &frame, cv::Point2f &ballpos, std::vector<object> &players);
   // just for testing
   int mymain(int argc, char *argv[]);

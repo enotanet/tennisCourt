@@ -4,6 +4,7 @@
 #include <string>
 
 FileFrameGrabber::FileFrameGrabber(const std::string &filename) : vc(filename) {
+  fprintf(stdout, "Opening file: %s\n", filename.c_str());
 }
 
 bool FileFrameGrabber::getNextFrame(cv::Mat *res) {

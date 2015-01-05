@@ -29,22 +29,31 @@ public:
 private:
   // An overkill.
   //
-  static const int max_frames_to_keep = (1 << 10);
+  static const int max_frames_to_keep = (1 << 6);
   std::vector<OutputResult> results;
 };
 
 class FrameProcessor {
 public:
-  FrameProcessor(size_t frame_number) : ballFinders(frame_number), cameraLocations(frame_number) {}
+  FrameProcessor(size_t frame_number) : ballFinders(frame_number), cameraLocations(frame_number), count(0), oa(-1) {}
   // Maybe bools?
   // Needs state! Wrap in a class.
   //
-  void ProcessFrames(std::vector<cv::Mat> frames, OutputResult *outputResult);
+  void ProcessFrames(std::vector<cv::Mat> frames, OutputResult *outputResult, bool s = 0);
 
 private:
   std::vector<BallFinder> ballFinders;
   std::vector<CameraLocation> cameraLocations;
+  std::vector<std::pair<int, cv::Point2f>> ballPositions;
+  int count;
+  double oa, ob, oc;
 };
+
+// Approximates the trajectory of a point moving in 2d space with a parabola.
+// This could be a projection of the ball inside a plane.
+//
+void BestTrajectories(const std::vector<std::pair<int, cv::Point2f>> &ballPositions,
+                      std::vector<cv::Point3d> *trajectories);
 
 void InitialiseOutput(size_t windowCount);
 

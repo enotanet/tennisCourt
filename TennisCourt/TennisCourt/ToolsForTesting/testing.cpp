@@ -2,19 +2,78 @@
 //
 
 #include "testing.h"
+#include "../court_display.h"
 #include "../sys_frame_grabber.h"
 #include "../sys_camera_grabber.h"
 #include "../sys_file_frame_grabber.h"
 #include "../sys_video_writer.h"
 #include "../utils.h"
 
-#include <ctime>
 #include <cassert>
+#include <cmath>
+#include <ctime>
 #include <memory>
+#include <vector>
+#include <opencv2/core/core.hpp>
 
 void run_tests() {
   INFO("Running tests!");
-  if (g_args.count("fout")) {
+  if (g_args["test"].size() && g_args["test"][0] == "line") {
+    std::vector<cv::Point3d> points;
+    points.push_back(cv::Point3d(0, 0, 0));
+    points.push_back(cv::Point3d(1, 0, 0));
+    points.push_back(cv::Point3d(0, 1, 0));
+    points.push_back(cv::Point3d(0, 0, 1));
+    points.push_back(cv::Point3d(0, 1, 1));
+    points.push_back(cv::Point3d(1, 0, 1));
+    points.push_back(cv::Point3d(1, 1, 0));
+    points.push_back(cv::Point3d(1, 1, 1));
+    for (size_t i = 0; i < points.size(); ++i) {
+      for (size_t j = 0; j < points.size(); ++j) {
+        for (size_t k = 0; k < points.size(); ++k) {
+          for (size_t l = 0; l < points.size(); ++l) {
+            cv::Point3d res = LineIntersect(points[i], points[j], points[k], points[l]);
+            INFO("Intersection of lines: " << points[i] << " " << points[j] <<
+                 " ; " << points[k] << " " << points[l] << " -> " << res);
+          }
+        }
+      }
+    }
+  } else if (g_args["test"].size() && g_args["test"][0] == "pparab") {
+    std::vector<cv::Point2d> points;
+    points.push_back(cv::Point2d(0, 0));
+    points.push_back(cv::Point2d(5, 0));
+    points.push_back(cv::Point2d(0, 5));
+    points.push_back(cv::Point2d(5, 5));
+
+    std::vector<cv::Point3d> parab;
+    parab.push_back(cv::Point3d(1, 0, 0));
+    parab.push_back(cv::Point3d(1, 2, 1));
+    for (cv::Point2d p : points) {
+      for (cv::Point3d q : parab) {
+        double d = PointToParabolaDistance(p, q.x, q.y, q.z);
+        INFO("Point to parab distance " << p << " ; " << q << " -> " << d);
+      }
+    }
+  } else if (g_args["test"].size() && g_args["test"][0] == "gpard") {
+    std::vector<cv::Point2d> points;
+    points.push_back(cv::Point2d(0, 0));
+    points.push_back(cv::Point2d(3, 3));
+    points.push_back(cv::Point2d(8, 0));
+    double a, b, c;
+    getParabola(points, &a, &b, &c);
+    DEBUG("Parabola defined by " << points[0] << " ; " << points[1] << " ; " << points[2]);
+    DEBUG("Parabola equation " << a << " " << b << " " << c);
+    for (auto p : points) {
+      double trajectory_dist = PointToParabolaDistance(p, a, b, c);
+      DEBUG("Dist " << p << " -> " << trajectory_dist);
+      assert(std::abs(trajectory_dist) < 1);
+    }
+  } else if (g_args.count("court_calibrate")) {
+    INFO("Running court calibration");
+    CourtDisplay displ(g_args["court_calibrate"][0]);
+    displ.calibrate();
+  } else if (g_args.count("fout")) {
     INFO("Testing reading and writing of video");
     SystemFrameGrabber *grabber;
     if (g_args.count("fin")) {

@@ -4,6 +4,7 @@
 #include <cstdlib>
 
 #include "histogram.h"
+#include "../CV_Utils/preprocessing.h"
 
 using namespace std;
 using namespace cv;
@@ -43,18 +44,10 @@ void displayHistogram(Mat &image, string windowName, vector<int> &intensitiesToH
  * Mat image - reference to an image for which histogram is drawn.
  */
 Mat drawHistogram(Mat &image) {
-  // Array to hold a number of pixels for each intensity value (0-255)
-  int intensities[256];
-  for(int i = 0; i < 255; i++) intensities[i] = 0;
   
-  // Calculate the number of pixels for each intensity value
-  for(int y = 0; y < image.rows; y++)
-  {
-    for(int x = 0; x < image.cols; x++)
-    {
-      intensities[(int)image.at<uchar>(y,x)]++;
-    }
-  }
+  // Get an array with number of pixels for each intensity
+  int* intensities = getIntensities(image);
+
   // Histogram to be displayed
   Mat histogram(histogramHeight, histogramWidth, CV_8UC1, Scalar(255, 255, 255));
 

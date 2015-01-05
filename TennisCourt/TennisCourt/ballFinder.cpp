@@ -509,7 +509,6 @@ int BallFinder::mymain(int argc, char *argv[])
   cout << capture.get(CV_CAP_PROP_FRAME_HEIGHT) << endl;
 
   int keyboard = 0;
-  int k = 0;
 
   while ((char) keyboard != 'q' && keyboard != 27) {
     if ((char) keyboard == 's') {

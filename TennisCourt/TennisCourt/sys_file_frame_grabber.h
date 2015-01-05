@@ -12,9 +12,11 @@ class SystemFileFrameGrabber : public SystemFrameGrabber {
 public:
   SystemFileFrameGrabber(const std::vector<std::string> &filename);
   bool getNextFrames(std::vector<cv::Mat> *res);
+  bool getNextFrame(size_t stream, std::vector<cv::Mat> *res);
   std::vector<cv::Mat> getContainer();
 private:
   std::vector<FileFrameGrabber> grabbers;
+  std::vector<int> offset;
 };
 
 #endif  // SYS_FILE_FRAME_GRABBER_H__
