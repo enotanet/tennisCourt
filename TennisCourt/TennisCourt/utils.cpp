@@ -114,55 +114,25 @@ double PointToParabolaDistance(cv::Point2d p, double a, double b, double c) {
 bool SolveCubic(double a, double b, double c, double d,
     std::vector<std::complex<double>> *roots) {
   if (std::abs(a) < 1e-7) {
-    // DEBUG("Solving cubic " << a << "*x^3 + " << b << "*x^2 + " << c << "*x + " << d);
-    // DEBUG("Equation is not cubic!");
-    return SolveQuadratic(b, c, d, roots);
+    DEBUG("Solving cubic " << a << "*x^3 + " << b << "*x^2 + " << c << "*x + " << d);
+    DEBUG("Equation is not cubic!");
+    return false;
   }
   std::complex<double> w = std::exp(2.0 * M_PI * std::complex<double>(0, 1) / 3.0);
   std::complex<double> del0(b * b - 3.0 * a * c, 0);
   std::complex<double> del1(2.0 * std::pow(b, 3) - 9.0 * a * b * c + 27.0 * a * a * d, 0);
   std::complex<double> tmp = del1 * del1 - 4.0 * std::pow(del0, 3.0);
   // double del = tmp / (-27.0 * a * a);
+  roots->clear();
   std::complex<double> C = std::pow(0.5 * (del1 + std::sqrt(tmp)), 1.0 / 3.0);
   std::complex<double> u[3];
   u[0] = 1;
   u[1] = u[0] * w;
   u[2] = u[1] * w;
   // DEBUG("Solving cubic " << a << "*x^3 + " << b << "*x^2 + " << c << "*x + " << d);
-  roots->clear();
   for (int i = 0; i < 3; ++i) {
-    roots->push_back(-1.0 / (3.0 * a) * (b + u[i] * C + del0 / (u[i] * C)));
+    roots->push_back(-1 / (3.0 * a) * (b + u[i] * C + del0 / (u[i] * C)));
     // DEBUG("Found root " << roots->back().real() << " + i*" << roots->back().imag());
   }
-  return true;
-}
-
-bool SolveQuadratic(double a, double b, double c,
-    std::vector<std::complex<double>> *roots) {
-  if (std::abs(a) < 1e-7) {
-    // DEBUG("Solving quadratic " << a << "*x^2 + " << b << "*x + " << c);
-    // DEBUG("Equation is not a quadratic!");
-    return SolveLinear(b, c, roots);
-  }
-  std::complex<double> det = b * b - 4.0 * a * c;
-  double s[2];
-  s[0] = 1;
-  s[1] = -1;
-
-  roots->clear();
-  for (int i = 0; i < 2; ++i) {
-    roots->push_back((-b + s[i] * std::sqrt(det)) * 0.5 / a);
-  }
-  return true;
-}
-
-bool SolveLinear(double a, double b, std::vector<std::complex<double>> *roots) {
-  // DEBUG("Solving linear " << a << "*x + " << b);
-  if (std::abs(a) < 1e-7) {
-    // DEBUG("Solving linear " << a << "*x + " << b);
-    return false;
-  }
-  roots->clear();
-  roots->push_back(-b / a);
   return true;
 }

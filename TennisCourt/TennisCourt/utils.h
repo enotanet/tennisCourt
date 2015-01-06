@@ -46,9 +46,4 @@ double PointToParabolaDistance(cv::Point2d p, double a, double b, double c);
 bool SolveCubic(double a, double b, double c, double d,
     std::vector<std::complex<double>> *roots);
 
-bool SolveQuadratic(double a, double b, double c,
-    std::vector<std::complex<double>> *roots);
-
-bool SolveLinear(double a, double b, std::vector<std::complex<double>> *roots);
-
 #endif
