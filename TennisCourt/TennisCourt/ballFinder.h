@@ -27,7 +27,8 @@ struct object {
 class BallFinder {
 public:
   BallFinder() : playersConsistency(0), frameDifference(-1), ballNotSeen(0) {}
-  bool addFrame(const cv::Mat &frame, cv::Point2f &ballpos, std::vector<object> &players);
+  bool addFrame(const cv::Mat &frame, cv::Point2f &ballpos, std::vector<object> &players,
+                std::vector<cv::Point2f> &candidates);
   // just for testing
   int mymain(int argc, char *argv[]);
 

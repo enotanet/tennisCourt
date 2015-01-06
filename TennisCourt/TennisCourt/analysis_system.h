@@ -22,6 +22,7 @@ struct ParabolaTraj2d {
 
   int first;
   int last;
+  int initial;
 
   cv::Point2d evaluate(double t) const {
     return cv::Point2d(xa * t * t + xb * t + xc, ya * t * t + yb * t + yc);
@@ -80,7 +81,7 @@ public:
 private:
   // An overkill.
   //
-  static const int max_frames_to_keep = (1 << 6);
+  static const int max_frames_to_keep = (1 << 8);
   std::vector<OutputResult> results;
 };
 
@@ -89,20 +90,35 @@ public:
   FrameProcessor(size_t frame_number) : ballFinders(frame_number),
                                         cameraLocations(frame_number),
                                         ballPositions2d(frame_number),
+                                        origBallPositions2d(frame_number),
+                                        ballCandidates2d(frame_number),
                                         count(0),
-                                        oa(-1) {}
+                                        oa(-1),
+                                        ytime(frame_number),
+                                        ytimeTent(frame_number),
+                                        xtime(frame_number),
+                                        xtimeTent(frame_number) {}
   // Maybe bools?
   // Needs state! Wrap in a class.
   //
   void ProcessFrames(std::vector<cv::Mat> frames, OutputResult *outputResult, bool s = 0);
 
 private:
+  bool ComputeTrajectories(int i, std::vector<ParabolaTraj2d> *trajectories);
+
   std::vector<BallFinder> ballFinders;
   std::vector<CameraLocation> cameraLocations;
   std::vector<std::vector<std::pair<int, cv::Point2f>>> ballPositions2d;
+  std::vector<std::vector<std::pair<int, cv::Point2f>>> origBallPositions2d;
+  std::vector<std::vector<std::pair<int, cv::Point2f>>> ballCandidates2d;
   int count;
   double oa, ob, oc;
   ParabolaTraj2d parab;
+  std::set<int> framesWithBalls;
+  std::vector<std::vector<std::pair<int, cv::Point2f>>> ytime;
+  std::vector<std::vector<std::pair<int, cv::Point2f>>> ytimeTent;
+  std::vector<std::vector<std::pair<int, cv::Point2f>>> xtime;
+  std::vector<std::vector<std::pair<int, cv::Point2f>>> xtimeTent;
 };
 
 bool MatchXYTrajectories(const std::vector<std::pair<int, cv::Point2f>> &xtime,
@@ -119,25 +135,22 @@ bool ParabolaSatisfiedSet(const std::vector<std::pair<int, cv::Point2f>> &ballPo
                           std::vector<int> *satisfied,
                           double *dist_sum);
 
-double PointToParabolaDistance(cv::Point2d p, const ParabolaTraj &parab) {
-  return PointToParabolaDistance(p, parab.a, parab.b, parab.c);
-}
+double PointToParabolaDistance(cv::Point2d p, const ParabolaTraj &parab);
 
-bool getParabola(std::vector<cv::Point2d> points, ParabolaTraj* parab) {
-  return getParabola(points, &parab->a, &parab->b, &parab->c);
-}
+bool getParabola(std::vector<cv::Point2d> points, ParabolaTraj* parab);
 
 // Approximates the trajectory of a point moving in 2d space with a parabola.
 // This could be a projection of the ball inside a plane.
 //
 void BestTrajectories(const std::vector<std::pair<int, cv::Point2f>> &ballPositions,
+                      const std::vector<std::pair<int, cv::Point2f>> &tentative,
                       std::vector<ParabolaTraj> *trajectories,
-                      int max_window_size = 24,
-                      int good_trajectory_threshold = 18,
-                      double trajectory_eps = 1);
+                      int max_window_size = 21,
+                      int good_trajectory_threshold = 9,
+                      double trajectory_eps = 1.0);
 
 void InitialiseOutput(size_t windowCount);
 
 void DisplayOutput(OutputResult output);
 
-#endif
+#endif  // ANALYSIS_SYSTEM_H__

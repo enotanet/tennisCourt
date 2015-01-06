@@ -47,7 +47,7 @@ cv::Point3d LineIntersect(cv::Point3d p0, cv::Point3d v0, cv::Point3d p1, cv::Po
   }
   double s = (b * e - c * d) / (a * c - b * b);
   double t = (a * e - b * d) / (a * c - b * b);
-  DEBUG("Line intersection distance: " << norm(p0 + s * v0 - p1 - t * v1));
+  // DEBUG("Line intersection distance: " << norm(p0 + s * v0 - p1 - t * v1));
   return (p0 + s * v0 + p1 + t * v1) * 0.5;
 }
 
@@ -61,11 +61,13 @@ bool getParabola(std::vector<cv::Point2d> points, double *a, double *b, double *
   double F = points[0].y - points[2].y;
   double det = A * D - B * C;
 
-  DEBUG("Extracting parabola from points " << points[0] << " ; "
-      << points[1] << " ; " << points[2]);
+  // DEBUG("Extracting parabola from points " << points[0] << " ; "
+  //     << points[1] << " ; " << points[2]);
 
   if (std::abs(det) < 1e-7) {
     // No parabola;
+    // This occurs way too often. Examine why!
+    //
     DEBUG("the first three points don't define a parabola");
     return false;
   }
