@@ -144,6 +144,7 @@ int main(int argc, char* argv[])
 #include <vector>
 #include <string>
 #include "analysis_system.h"
+#include "simple_calibrate.h"
 #include "sys_camera_grabber.h"
 #include "sys_file_frame_grabber.h"
 #include "utils.h"
@@ -169,10 +170,13 @@ std::vector<std::string> parseFilenames(int argc, char* argv[]) {
 // Modes: from file, from cameras(only support 4 camera mode?).
 //
 void execute() {
-  if (g_args.count("calibrate")) {
+  if (g_args["calibrate"].size() == 2) {
     // This should be ran only occasionaly.
     //
     INFO("Begin calibration of the camera from video file. Display some output!");
+    SystemFileFrameGrabber grabber(g_args["fin"]);
+    INFO("Grabber initialised");
+    ExtractCorners(g_args["calibrate"][0], &grabber, g_args["calibrate"][1]);
   } else if (!g_args.count("fin")) {
     // This mode should do real-time video capture, track the
     // score and display a 2d model of the court.

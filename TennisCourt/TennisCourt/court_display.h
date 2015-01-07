@@ -12,11 +12,12 @@ class CourtDisplay {
 public:
   // Constructs a CourtDisplay based on the image provided in filename.
   //
-  CourtDisplay(std::string filename);
+  CourtDisplay(std::string filename, std::string calib_file = std::string());
   // Returns a frame with the marked position of the ball and players.
   // Coordinates are provided in meters based on the centre of the tennis court.
   //
   bool display(cv::Point2d ball, std::vector<cv::Point2d> players, cv::Mat *res);
+  bool displayMultiple(std::vector<cv::Point2d> balls, cv::Mat *res);
   // Runs a simple calibration program, with which the user can align the
   // corners of the tennis court. If we are always using the same image,
   // extract parameters as a config file.

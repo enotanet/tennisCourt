@@ -10,26 +10,18 @@ OBJ_FILES = $(addprefix obj/,$(notdir $(CPP_FILES:.cpp=.o)))
 OBJ_TEST_FILES = $(addprefix obj/test/,$(notdir $(CPP_TEST:.cpp=.o)))
 OBJ_TESTUTILS = $(addprefix obj/utils/,$(notdir $(CPP_CVUTILS:.cpp=.o)))
 
-# all: tennis.o ballFinder.o filegrabber.o videowrite.o
-# 	$(CC) -o binary tennis.o ballFinder.o filegrabber.o videowrite.o $(LIBS)
-# videowrite.o: $(SOURCE_DIR)/video_writer.cpp
-# 	$(CC) $(CFLAGS) -c -o videowrite.o $(SOURCE_DIR)/video_writer.cpp
-# filegrabber.o: $(SOURCE_DIR)/file_frame_grabber.cpp
-# 	$(CC) $(CFLAGS) -c -o filegrabber.o $(SOURCE_DIR)/file_frame_grabber.cpp
-# tennis.o: $(SOURCE_DIR)/TennisCourt.cpp
-# 	$(CC) $(CFLAGS) -c -o tennis.o $(SOURCE_DIR)/TennisCourt.cpp
-# ballFinder.o: $(SOURCE_DIR)/ballFinder.cpp
-# 	$(CC) $(CFLAGS) -c -o ballFinder.o $(SOURCE_DIR)/ballFinder.cpp
-# simple: simple.cpp
-# 	$(CC) $(CFLAGS) -c -o simple.o simple.cpp
+MKDIR_P = mkdir -p
 
 all: $(OBJ_FILES) $(OBJ_TEST_FILES) $(OBJ_TESTUTILS)
 	$(CC) -o binary $^ $(LIBS)
 $(OBJ_DIR)/%.o: $(SOURCE_DIR)/%.cpp
+	$(MKDIR_P) $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
 obj/test/%.o: $(SOURCE_DIR)/ToolsForTesting/%.cpp
+	$(MKDIR_P) $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
 obj/utils/%.o: $(SOURCE_DIR)/CV_Utils/%.cpp
+	$(MKDIR_P) $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
 clean:
 	rm -rf $(OBJ_DIR)/*.o binary $(OBJ_DIR)/test/*.o $(OBJ_DIR)/utils/*.o

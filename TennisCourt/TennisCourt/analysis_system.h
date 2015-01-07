@@ -5,6 +5,8 @@
 #include "sys_frame_grabber.h"
 #include "ballFinder.h"
 #include "utils.h"
+#include "simple_calibrate.h"
+#include "court_display.h"
 #include <opencv2/core/core.hpp>
 #include <vector>
 #include <set>
@@ -31,6 +33,7 @@ struct ParabolaTraj2d {
 
 class LinkedParabolaTrajectory2d {
 public:
+  LinkedParabolaTrajectory2d() {}
   LinkedParabolaTrajectory2d(
       const std::vector<std::pair<int, cv::Point2f>> &points,
       const std::vector<ParabolaTraj2d> &trajectories);
@@ -97,11 +100,16 @@ public:
                                         ytime(frame_number),
                                         ytimeTent(frame_number),
                                         xtime(frame_number),
-                                        xtimeTent(frame_number) {}
+                                        xtimeTent(frame_number),
+                                        traj(frame_number) {}
   // Maybe bools?
   // Needs state! Wrap in a class.
   //
-  void ProcessFrames(std::vector<cv::Mat> frames, OutputResult *outputResult, bool s = 0);
+  void ProcessFrames(std::vector<cv::Mat> frames,
+                     OutputResult *outputResult,
+                     CalibratedCamera *calib = nullptr,
+                     CourtDisplay *displ = nullptr,
+                     CourtDisplay *displ2 = nullptr);
 
 private:
   bool ComputeTrajectories(int i, std::vector<ParabolaTraj2d> *trajectories);
@@ -119,6 +127,7 @@ private:
   std::vector<std::vector<std::pair<int, cv::Point2f>>> ytimeTent;
   std::vector<std::vector<std::pair<int, cv::Point2f>>> xtime;
   std::vector<std::vector<std::pair<int, cv::Point2f>>> xtimeTent;
+  std::vector<LinkedParabolaTrajectory2d> traj;
 };
 
 bool MatchXYTrajectories(const std::vector<std::pair<int, cv::Point2f>> &xtime,
@@ -145,9 +154,9 @@ bool getParabola(std::vector<cv::Point2d> points, ParabolaTraj* parab);
 void BestTrajectories(const std::vector<std::pair<int, cv::Point2f>> &ballPositions,
                       const std::vector<std::pair<int, cv::Point2f>> &tentative,
                       std::vector<ParabolaTraj> *trajectories,
-                      int max_window_size = 21,
-                      int good_trajectory_threshold = 9,
-                      double trajectory_eps = 1.0);
+                      int max_window_size = 20,
+                      int good_trajectory_threshold = 12,
+                      double trajectory_eps = 1.2);
 
 void InitialiseOutput(size_t windowCount);
 

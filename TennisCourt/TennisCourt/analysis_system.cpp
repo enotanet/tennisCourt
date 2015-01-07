@@ -2,6 +2,8 @@
 #include "camera_location.h"
 #include "sys_frame_grabber.h"
 #include "utils.h"
+#include "simple_calibrate.h"
+#include "court_display.h"
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <vector>
@@ -18,9 +20,18 @@ void RunOfflineSystem(SystemFrameGrabber *grabber) {
   // What about ownership of grabber? Should be system-wide.
   //
   OutputBuffer outputBuffer;
+  if (g_args["calibrate"].size() < 1) {
+    g_args["calibrate"].push_back("");
+  }
+  CalibratedCamera calib(CalibReadFile(g_args["calibrate"][0]));
+  if (g_args["cd"].size() < 1) {
+    g_args["cd"].push_back("");
+  }
+  CourtDisplay displ("TennisCourt/TestData/Court/courtFromTop.jpg", g_args["cd"][0]);
+  CourtDisplay displ2("TennisCourt/TestData/Court/courtFromTop.jpg", g_args["cd"][0]);
 
   std::vector<cv::Mat> frames = grabber->getContainer();
-  InitialiseOutput(frames.size());
+  InitialiseOutput(frames.size() + 2);
   FrameProcessor proc(frames.size());
 
   INFO("Found " << frames.size() << " things");
@@ -48,7 +59,7 @@ void RunOfflineSystem(SystemFrameGrabber *grabber) {
       while (outputBuffer.lastFrame + 1 < frame_position) {
         grabber->getNextFrames(&frames);
         OutputResult res;
-        proc.ProcessFrames(frames, &res, 1);
+        proc.ProcessFrames(frames, &res, &calib, &displ);
         outputBuffer.put(res);
       }
       break;
@@ -62,7 +73,7 @@ void RunOfflineSystem(SystemFrameGrabber *grabber) {
     while (outputBuffer.lastFrame < frame_position) {
       grabber->getNextFrames(&frames);
       OutputResult res;
-      proc.ProcessFrames(frames, &res);
+      proc.ProcessFrames(frames, &res, &calib, &displ);
       outputBuffer.put(res);
     }
     DisplayOutput(outputBuffer.get(frame_position));
@@ -101,13 +112,27 @@ bool myComp(const std::pair<int, cv::Point2f> &a, const std::pair<int, cv::Point
   return a.first < b.first;
 };
 
+bool IntersectIn3d(size_t c1, cv::Point2d p1, size_t c2, cv::Point2d p2,
+    CalibratedCamera *calib, cv::Point3d *res) {
+  cv::Point3d A1, B1, A2, B2;
+  if (!calib->GetRay(c1, p1, &A1, &B1)) {
+    return false;
+  }
+  if (!calib->GetRay(c2, p2, &A2, &B2)) {
+    return false;
+  }
+  *res = LineIntersect(A1, (B1 - A1), A2, (B2 - A2));
+  return true;
+}
 
 // TODO: Main function that deals with processing each set of frames.
 // Put the results in outputResult so it can be used to display now or later
 //
 void FrameProcessor::ProcessFrames(std::vector<cv::Mat> frames,
     OutputResult *outputResult,
-    bool skip_clone) {
+    CalibratedCamera *calib,
+    CourtDisplay *displ,
+    CourtDisplay *displ2) {
   // Multithread this & reading maybe. Reduce the number of clones!
   for (size_t i = 0; i < frames.size(); ++i) {
     cv::Point2f ballPosition(-1, -1);
@@ -181,7 +206,7 @@ void FrameProcessor::ProcessFrames(std::vector<cv::Mat> frames,
       if (trajectories.size()) {
         // Try to extend the balls with points from ballCandidates.
         //
-        LinkedParabolaTrajectory2d linkedTrajectoriesI(ballPositions2d[i], trajectories);
+        // LinkedParabolaTrajectory2d linkedTrajectoriesI(ballPositions2d[i], trajectories);
         bool change = false;
         for (auto cand : ballCandidates2d[i]) {
           if (framesWithBalls.find(cand.first) != framesWithBalls.end()) {
@@ -218,7 +243,7 @@ void FrameProcessor::ProcessFrames(std::vector<cv::Mat> frames,
           //
           for (auto traj : trajectories) {
             cv::Point2d p(cand.second.x, cand.second.y);
-            if (cv::norm(traj.evaluate(cand.first) - p) < 0.9) {
+            if (cv::norm(traj.evaluate(cand.first) - p) < 1.4) {
               change = true;
               ballPositions2d[i].push_back(cand);
               ytime[i].push_back(std::make_pair(cand.first,
@@ -273,6 +298,7 @@ void FrameProcessor::ProcessFrames(std::vector<cv::Mat> frames,
           for (auto p : origBallPositions2d[i]) {
             cv::circle(frames[i], p.second, 1.5, cv::Scalar(0, 0, 255), -1, 8);
           }
+          traj[i] = linkedTrajectories;
         }
       }
     }
@@ -289,8 +315,83 @@ void FrameProcessor::ProcessFrames(std::vector<cv::Mat> frames,
     if (!cameraLocations[i].GetCoordinate(frames[i], &cameraCoords)) {
       // Oops. Don't continue with analysis
     }
-    if (!skip_clone)
-      outputResult->images.push_back(frames[i].clone());
+    outputResult->images.push_back(frames[i].clone());
+  }
+
+  // Just do it for 2. Fix it for more later.
+  //
+  if (calib && frames.size() >= 2) {
+    if (count % 30) {
+      bool canIntersect = true;
+      cv::Point2d P[frames.size()];
+      for (size_t i = 0; i < frames.size(); ++i) {
+        if (!ballPositions2d[i].size()) {
+          canIntersect = false;
+          break;
+        }
+        auto fpos = ballPositions2d[i].back();
+        if (fpos.first != count) {
+          canIntersect = false;
+          break;
+        }
+        P[i] = cv::Point2d(fpos.second.x, fpos.second.y);
+      }
+      if (canIntersect) {
+        cv::Point3d ball3d;
+        if (IntersectIn3d(0, P[0], 1, P[1], calib, &ball3d)) {
+          if (displ) {
+            cv::Mat courtWithBall;
+            displ->display(cv::Point2d(ball3d.x, ball3d.y),
+                std::vector<cv::Point2d>(), &courtWithBall);
+            outputResult->images.push_back(courtWithBall.clone());
+          }
+          if (displ2) {
+            cv::Mat courtWithBall;
+            displ->display(cv::Point2d(ball3d.x, ball3d.z),
+                std::vector<cv::Point2d>(), &courtWithBall);
+            outputResult->images.push_back(courtWithBall.clone());
+          }
+          cv::Mat XZimg = cv::Mat::zeros(128, 128, CV_8UC3);
+          cv::Point2d d(ball3d.x / 12 * 50 + 64, 128 - ball3d.z / 5 * 128);
+          cv::circle(XZimg, d, 2,
+              cv::Scalar(0, 255, 0), 1, 8);
+          outputResult->images.push_back(XZimg.clone());
+        }
+      }
+    } else {
+      std::vector<cv::Point2d> psy;
+      std::vector<cv::Point2d> psz;
+      for (int t = 0; t <= count; ++t) {
+        cv::Point2d P[frames.size()];
+        if (traj[0].EvaluateAt(t, &P[0])) {
+          if (traj[1].EvaluateAt(t, &P[1])) {
+            cv::Point3d ball3d;
+            if (IntersectIn3d(0, P[0], 1, P[1], calib, &ball3d)) {
+              psy.push_back(cv::Point2d(ball3d.x, ball3d.y));
+              psz.push_back(cv::Point2d(ball3d.x, ball3d.z));
+            }
+          }
+        }
+      }
+      if (displ) {
+        cv::Mat courtWithBall;
+        displ->displayMultiple(psy, &courtWithBall);
+        outputResult->images.push_back(courtWithBall.clone());
+      }
+      if (displ2) {
+        cv::Mat courtWithBall;
+        displ->displayMultiple(psz, &courtWithBall);
+        outputResult->images.push_back(courtWithBall.clone());
+      }
+      cv::Mat XZimg = cv::Mat::zeros(128, 128, CV_8UC3);
+      for (size_t t = 0; t < psz.size(); ++t) {
+        double ps = (double) t / psz.size() * 255.0;
+        cv::Point2d d(psz[t].x / 12 * 50 + 64, 128 - psz[t].y / 5 * 128);
+        cv::circle(XZimg, d, 2,
+            cv::Scalar(255 - ps, 0, ps), 1, 8);
+      }
+      outputResult->images.push_back(XZimg.clone());
+    }
   }
   ++count;
 }
@@ -321,8 +422,8 @@ bool MatchXYTrajectories(const std::vector<std::pair<int, cv::Point2f>> &xtime,
                          const std::vector<std::pair<int, cv::Point2f>> &ytime,
                          const std::vector<ParabolaTraj> &ytrajectories,
                          std::vector<ParabolaTraj2d> *trajectories) {
-  const int min_common_points = 6;
-  const double trajectory_eps = 1.0;
+  const int min_common_points = 8;
+  const double trajectory_eps = 1.2;
   trajectories->clear();
   for (size_t i = 0; i < xtrajectories.size(); ++i) {
     // Optimise second loop to do a lookup instead of linear search.
