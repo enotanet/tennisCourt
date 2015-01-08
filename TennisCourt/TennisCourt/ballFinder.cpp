@@ -1,4 +1,5 @@
 #include "ballFinder.h"
+#include "utils.h"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/video/background_segm.hpp"
@@ -102,7 +103,10 @@ vector<ballCandidate> BallFinder::findBallCandidates(Point2f p) {
     currentBallCandidates = nextBallCandidates;
     nextBallCandidates.clear();
   }
-  // cout << "got sth, size " << currentBallCandidates.size() << endl;
+  DEBUG(endl << endl << endl << "got some ball candidates, size " << currentBallCandidates.size() << endl << endl << endl);
+  for (ballCandidate bc : currentBallCandidates) {
+    circle(frame, bc.lastPosition, 2, Scalar(40, 0, 40), -1, 8);
+  }
   return currentBallCandidates;
 }
 
@@ -240,6 +244,16 @@ vector< vector<Point> > BallFinder::getRepresentatives() {
   return representatives;
 }
 
+void BallFinder::printIsolatedPoints() {
+  for (auto isolatedPoints : setsOfIsolatedPoints) {
+    cout <<  "[";
+    for (auto next : isolatedPoints) {
+      cout << next << ", ";
+    }
+    cout << "]" << endl;
+  }
+}
+
 void BallFinder::printContour(vector<Point> contour) {
   for (Point p : contour) cout << p << ", ";
   cout << endl;
@@ -250,12 +264,19 @@ void BallFinder::findPossibleBallPositions(int ballNotSeen, vector<Point2f> &can
     if (contours[i].size() <= ballContourSizeThreshold && 
         norm(centres[i] - lastBallPosition) < sqrt(ballNotSeen) * maxDistanceBetweenFrames) {
       candidates.push_back(centres[i]);
-      circle(frame, centres[i], 4, Scalar(50, 100, 150), -1, 8);
+      //circle(frame, centres[i], 4, Scalar(50, 100, 150), -1, 8);
+      circle(frame, centres[i], 2, Scalar(50, 100, 150), -1, 8);
     }
   }
 }
 
-bool BallFinder::findBall(Point2f &ballpos, vector<Point2f> &candidates) {
+bool BallFinder::findBallNew(vector<Point2f> &ballpos, vector<Point2f> &candidates) {
+  DEBUG(endl);
+  DEBUG(endl);
+  DEBUG(endl);
+  DEBUG(endl);
+  DEBUG(endl);
+  DEBUG("new frame");
   //line(frame, Point(100,100), Point(100,200),Scalar(0,0,255),1,8,0);
   size_t size = ballCandidates.size();
   bool found = false;
@@ -267,7 +288,7 @@ bool BallFinder::findBall(Point2f &ballpos, vector<Point2f> &candidates) {
     // check if current position has been found
     if (norm(currentPosition) != 0) {
       circle(frame, currentPosition, 4, Scalar(255,0,0), -1, 8);
-      ballpos = currentPosition;
+      ballpos.push_back(currentPosition);
       lastBallPosition = currentPosition;
       found = true;
       updateCurrentPosition(candidate, currentPosition, frameDifference);
@@ -283,16 +304,161 @@ bool BallFinder::findBall(Point2f &ballpos, vector<Point2f> &candidates) {
         ++frameDifference;
     }
   } else if (size > 1) {
-    // cout << endl << endl << "MORE THAN 1 CANDIDATE" << endl << endl << endl;
+    DEBUG(endl << endl << "MORE THAN 1 CANDIDATE, size " << size << endl << endl << endl);
+    frameDifference = 1;
+    vector<ballCandidate> newBallCandidates;
     Point2f currentPosition;
     for (int i = 0; i < size; ++i) {
       //ballCandidate *candidate = &ballCandidates[i];
-      ballCandidate *candidate = &ballCandidates[0];
-      ballCandidates.erase(ballCandidates.begin());
-      currentPosition = findCurrentPosition(*candidate, frameDifference);
+      DEBUG("next candidate" << endl);
+      ballCandidate *candidate = &ballCandidates[i];
+      DEBUG("its last positon: " << candidate->lastPosition << endl);
+      circle(frame, candidate->lastPosition, 8, Scalar(0, 150, 50), -1, 8);
+      //ballCandidates.erase(ballCandidates.begin());
+      currentPosition = findCurrentPosition(*candidate, 1);
       if (norm(currentPosition) != 0) {
-        updateCurrentPosition(candidate, currentPosition, frameDifference);
-        ballCandidates.push_back(*candidate);
+        DEBUG("found new point, cur position: " << currentPosition << endl);
+        ballpos.push_back(currentPosition);
+        updateCurrentPosition(candidate, currentPosition, 1);
+        newBallCandidates.push_back(*candidate);
+        circle(frame, candidate->lastPosition, 4, Scalar(250, 150, 50), -1, 8);
+        found = true;
+      } /*else { // if not found then remove this ball candidate
+        //DEBUG("continuation not found, erase " << endl);
+        ballCandidates.erase(ballCandidates.begin() + i);
+        --i; // not sure if this is gonna work (erasing elements from a vector while iterating through it
+      }*/
+    }
+    ballCandidates = newBallCandidates;
+    DEBUG("ballcandidates size now: " << ballCandidates.size() << endl);
+    for (ballCandidate bc : ballCandidates) {
+      DEBUG("ballCand, lastPos: " << bc.lastPosition << endl);
+    }
+  } else {
+    // no ball candidates so far
+    DEBUG("no candidates" << endl);
+    if (ballNotSeen > 0) {
+      DEBUG("ballNotSeen = " << ballNotSeen);
+      findPossibleBallPositions(ballNotSeen, candidates);
+      ++ballNotSeen;
+    }
+    if (setsOfIsolatedPoints.size() == numberOfFrames) {
+      vector<Point2f> startPoints = setsOfIsolatedPoints[numberOfFrames - 1];
+      vector<ballCandidate> candidates;
+      //DEBUG("have " << startPoints.size() << " start points" << endl);
+      for (Point2f p : startPoints) {
+        // new way of doing that
+        candidates = findBallCandidates(p);
+        if (candidates.size() > 0) 
+          ballCandidates.insert(ballCandidates.begin() + ballCandidates.size(), candidates.begin(),
+            candidates.end());
+        /*
+        if (hasRightTrajectory(p)) {
+          //DEBUG("right trajectory found!" << endl);
+          ballCandidate candidate = recoverBallCandidate(p);
+          ballCandidates.push_back(candidate);
+        }
+        */
+      }
+    }
+    if (ballCandidates.size() > 0) {
+      DEBUG("have some ballcands now\n");
+      for (ballCandidate bc : ballCandidates) {
+        DEBUG("candidate: last position ");
+        DEBUG(bc.lastPosition);
+        DEBUG(", xdiff ");
+        DEBUG(bc.xDiff);
+        DEBUG(", ydiff ");
+        DEBUG(bc.yDiff);
+      }
+    }
+  }
+
+  // prepare args for a call to calcOpticalFlow - VERY wrong comment I guess.
+  //vector<uchar> status;
+  //vector<float> err;
+  //TermCriteria termcrit(TermCriteria::COUNT|TermCriteria::EPS, 20, 0.03);
+  //Size subPixWinSize(10,10), winSize(31,31);
+  //vector<Point2f> nextPoints;
+
+  return found;
+}
+
+
+bool BallFinder::findBall(Point2f &ballpos, vector<Point2f> &candidates) {
+  DEBUG(endl);
+  DEBUG(endl);
+  DEBUG(endl);
+  DEBUG(endl);
+  DEBUG(endl);
+  DEBUG("new frame");
+  //line(frame, Point(100,100), Point(100,200),Scalar(0,0,255),1,8,0);
+  size_t size = ballCandidates.size();
+  bool found = false;
+  DEBUG("ballCand size " << size);
+
+  if (size == 1) {
+    ballCandidate *candidate = &ballCandidates[0];
+    Point2f currentPosition = findCurrentPosition(*candidate, frameDifference);
+    // check if current position has been found
+    if (norm(currentPosition) != 0) {
+      circle(frame, currentPosition, 4, Scalar(255,0,0), -1, 8);
+      ballpos = currentPosition;
+      lastBallPosition = currentPosition;
+      found = true;
+      updateCurrentPosition(candidate, currentPosition, frameDifference);
+      frameDifference = 1;
+      ballNotSeen = 0;
+      DEBUG("found cur position: " << currentPosition << endl << endl << endl);
+    } else {
+      ++ballNotSeen;
+      findPossibleBallPositions(ballNotSeen, candidates);
+      if (frameDifference > 3) {
+        ballCandidates.clear();
+        frameDifference = 1;
+      } else 
+        ++frameDifference;
+    }
+
+    DEBUG("look for coexisting ball candidates" << endl);
+    vector<Point2f> startPoints = setsOfIsolatedPoints[numberOfFrames - 1];
+    vector<ballCandidate> candidates;
+    //DEBUG("have " << startPoints.size() << " start points" << endl);
+    for (Point2f p : startPoints) {
+      // new way of doing that
+      candidates = findBallCandidates(p);
+      for (ballCandidate bc : candidates) {
+        DEBUG("found sth" << endl);
+        DEBUG("lastPos: " << bc.lastPosition << endl);
+        if (norm(bc.lastPosition - currentPosition) > eps) {
+          DEBUG("insert " << endl);
+          ballCandidates.insert(ballCandidates.begin() + ballCandidates.size(), bc);
+        }
+      }
+      //if (candidates.size() > 0) 
+      //  ballCandidates.insert(ballCandidates.begin() + ballCandidates.size(), candidates.begin(),
+       //   candidates.end());
+    }
+  } else if (size > 1) {
+    DEBUG(endl << endl << "MORE THAN 1 CANDIDATE, size " << size << endl << endl << endl);
+    frameDifference = 1;
+    vector<ballCandidate> newBallCandidates;
+    Point2f currentPosition;
+    for (size_t i = 0; i < size; ++i) {
+      //ballCandidate *candidate = &ballCandidates[i];
+      DEBUG("next candidate" << endl);
+      ballCandidate *candidate = &ballCandidates[i];
+      DEBUG("its last positon: " << candidate->lastPosition << endl);
+      circle(frame, candidate->lastPosition, 8, Scalar(0, 150, 50), -1, 8);
+      //ballCandidates.erase(ballCandidates.begin());
+      currentPosition = findCurrentPosition(*candidate, 1);
+      if (norm(currentPosition) != 0) {
+        DEBUG("found new point, cur position: " << currentPosition << endl);
+        ballpos = currentPosition;
+        updateCurrentPosition(candidate, currentPosition, 1);
+        newBallCandidates.push_back(*candidate);
+        circle(frame, candidate->lastPosition, 4, Scalar(250, 150, 50), -1, 8);
+        found = true;
       } /*else { // if not found then remove this ball candidate
         //cout << "continuation not found, erase " << endl;
         ballCandidates.erase(ballCandidates.begin() + i);
@@ -441,7 +607,7 @@ void BallFinder::findPlayers(vector<object> &players) {
     //float y = (player.top.y + player.bottom.y + player.left.y + player.right.y) / 4;
     //circle(frame, Point2f(x, y), 4, Scalar(0, 255, 0), -1, 8);
     circle(frame, player.centre, 4, Scalar(100, 100, 100), -1, 8);
-    //cout << "centre " << player.centre << endl;
+    //DEBUG("centre " << player.centre << endl);
   }
 
   /*
@@ -466,8 +632,70 @@ void BallFinder::findPlayers(vector<object> &players) {
 
 /* returns true if it found the ball. Also tries to return positions of both players -
  * if the players vector is nonempty then it found the positions of players */
-bool BallFinder::addFrame(const Mat &frame, Point2f &ballpos, vector<object> &players,
-                          vector<cv::Point2f> &candidates) {
+bool BallFinder::addFrameNew(const Mat &frame, vector<Point2f> &ballpos, vector<object> &players,
+                                          vector<Point2f> &candidates) {
+
+  Mat m = Mat();
+  cout << "Mat(): " << m.size() << endl;
+  updateFrames(frame);
+
+  //update the background model
+  pMOG2.operator()(frame, fgMask, 0.01);
+
+  //Mat back;
+  //pMOG2.getBackgroundImage(back);
+  //imshow("back", back);
+
+  //imshow("mask before opening", fgMask);
+
+  // do an opening (erosion and dilation) on the mask
+  erode(fgMask, fgMask, Mat());
+  dilate(fgMask, fgMask, Mat()); 
+
+  //imshow("mask after opening", fgMask);
+
+  findContours(fgMask, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE); 
+  drawContours(frame, contours, -1, cv::Scalar(0, 0, 255), 0.1);
+
+  representatives = getRepresentatives();
+  centres = getCentres();
+  vector<Point2f> isolatedPts = getIsolatedPoints();
+  updatesetsOfIsolatedPoints(isolatedPts);
+  printIsolatedPoints();
+  
+  /* 
+  Mat dst, detected_edges;
+
+  int edgeThresh = 1;
+  int lowThreshold = 16;
+  int ratio = 3;
+  int kernel_size = 3;
+  const char* window_name = "Edge Map";
+
+  dst.create( frame.size(), frame.type() );
+
+  /// Reduce noise with a kernel 3x3
+  blur( frame, detected_edges, Size(3,3) );
+  
+  /// Canny detector
+  Canny( detected_edges, detected_edges, lowThreshold, lowThreshold*ratio, kernel_size );
+  
+  /// Using Canny's output as a mask, we display our result
+  dst = Scalar::all(0);
+  
+  frame.copyTo( dst, detected_edges);
+  imshow( window_name, dst );
+  */
+
+  findPlayers(players);
+  //return true;
+  return findBallNew(ballpos, candidates);
+}
+
+/* returns true if it found the ball. Also tries to return positions of both players -
+ * if the players vector is nonempty then it found the positions of players */
+bool BallFinder::addFrame(const Mat &frame, Point2f &ballpos, vector<object> &players, 
+                              vector<Point2f> &candidates) {
   updateFrames(frame);
 
   //update the background model
@@ -587,11 +815,11 @@ int BallFinder::mymain(int argc, char *argv[])
     }
 
     vector<object> players;
-    Point2f ballpos;
+    vector<Point2f> ballpos;
+    vector<Point2f> candidates;
 
-    std::vector<cv::Point2f> cand;
-    if (addFrame(frame, ballpos, players, cand)) {
-      cout << "have the ball..." << endl;
+    if (addFrameNew(frame, ballpos, players, candidates)) {
+      DEBUG("have the ball...");
     }
 
     imshow("Frame", frame);

@@ -26,9 +26,11 @@ struct object {
 // common code from ball & person detector.
 class BallFinder {
 public:
-  BallFinder() : playersConsistency(0), frameDifference(-1), ballNotSeen(0) {}
-  bool addFrame(const cv::Mat &frame, cv::Point2f &ballpos, std::vector<object> &players,
-                std::vector<cv::Point2f> &candidates);
+  BallFinder() : playersConsistency(0), frameDifference(1), ballNotSeen(0) {}
+  bool addFrame(const cv::Mat &frame, cv::Point2f &ballpos, std::vector<object> &players, 
+                          std::vector<cv::Point2f> &candidates);
+  bool addFrameNew(const cv::Mat &frame, std::vector<cv::Point2f> &ballpos, 
+                      std::vector<object> &players, std::vector<cv::Point2f> &candidates);
   // just for testing
   int mymain(int argc, char *argv[]);
 
@@ -49,6 +51,7 @@ private:
   std::vector<cv::Point2f> getCentres();
   std::vector<cv::Point2f> getIsolatedPoints();
   void updateCurrentPosition(ballCandidate *candidate, cv::Point2f currentPosition, int frameDifference);
+  bool findBallNew(std::vector<cv::Point2f> &ballpos, std::vector<cv::Point2f> &candidates);
   bool findBall(cv::Point2f &ballpos, std::vector<cv::Point2f> &candidates);
   void findPossibleBallPositions(int, std::vector<cv::Point2f>&);
   void findPlayers(std::vector<object> &players);
@@ -59,6 +62,7 @@ private:
   bool isNearby(object&, cv::Point2f&);
   void updateObject(object&, int);
   void printObject(object&);
+  void printIsolatedPoints();
   void sortContours();
 
   std::vector<cv::Mat> frames; // will contain last 'numberOfFrames' frames
