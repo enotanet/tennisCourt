@@ -55,7 +55,7 @@ vector<pair<Point2f, Point3d>> mapCourtCornersTo3DCoordinates(Mat &frame, vector
       lowestCorner = corner;
     }
   }
-  result.push_back(make_pair(lowestCorner, Point3d(xCoefficient * 18, yCoefficient * 39, 0)));
+  result.push_back(make_pair(lowestCorner, Point3d(xCoefficient * 39, yCoefficient * 18, 0)));
 
   std::sort(courtCorners.begin(), courtCorners.end(), [] (Point2f p, Point2f q) {    
     return p.x > q.x;
@@ -77,9 +77,9 @@ vector<pair<Point2f, Point3d>> mapCourtCornersTo3DCoordinates(Mat &frame, vector
   }
   
   if (shorterSideCorners.size() > 0) {
-    result.push_back(make_pair(shorterSideCorners[0], Point3d(xCoefficient * 18, yCoefficient * 21, 0)));
+    result.push_back(make_pair(shorterSideCorners[0], Point3d(xCoefficient * 21, yCoefficient * 18, 0)));
     if (shorterSideCorners.size() > 1) {
-      result.push_back(make_pair(shorterSideCorners[1], Point3d(xCoefficient * 13.5, yCoefficient * 21, 0)));
+      result.push_back(make_pair(shorterSideCorners[1], Point3d(xCoefficient * 21, yCoefficient * 13.5, 0)));
     }
   }  
 
@@ -88,34 +88,34 @@ vector<pair<Point2f, Point3d>> mapCourtCornersTo3DCoordinates(Mat &frame, vector
     double dy = lowestCorner.y - corner.y;
     if (dx < 0.1 * frame.cols
         && dy < 0.25 * frame.rows) {
-      result.push_back(make_pair(corner, Point3d(xCoefficient * 13.5, yCoefficient * 21, 0)));
+      result.push_back(make_pair(corner, Point3d(xCoefficient * 21, yCoefficient * 13.5, 0)));
     } else if (dx < 0.15 * frame.cols
                && dy < 0.1 * frame.rows) {
-      result.push_back(make_pair(corner, Point3d(xCoefficient * 13.5, yCoefficient * 39, 0)));
+      result.push_back(make_pair(corner, Point3d(xCoefficient * 39, yCoefficient * 13.5, 0)));
     } else if (dx < 0.175 * frame.cols
                && dy < 0.25 * frame.rows) {
-      result.push_back(make_pair(corner, Point3d(0, yCoefficient * 21, 0)));
+      result.push_back(make_pair(corner, Point3d(xCoefficient * 21, 0, 0)));
     } else if (dx < 0.325 * frame.cols
                && dx > 0.225 * frame.cols
                && dy < 0.2 * frame.rows) {
-      result.push_back(make_pair(corner, Point3d(0, yCoefficient * 39, 0)));
+      result.push_back(make_pair(corner, Point3d(xCoefficient * 39, 0, 0)));
     } else if (dx < 0.35 * frame.cols
                && dx > 0.325 * frame.cols
                && dy < 0.3 * frame.rows) {
-      result.push_back(make_pair(corner, Point3d(xCoefficient * 13.5, yCoefficient * 21, 0)));
+      result.push_back(make_pair(corner, Point3d(xCoefficient * 21, yCoefficient * 13.5, 0)));
     } else if (dx < 0.425 * frame.cols
                && dx > 0.35 * frame.cols
                && dy < 0.2 * frame.rows) {
-      result.push_back(make_pair(corner, Point3d(xCoefficient * 13.5, yCoefficient * 39, 0)));
+      result.push_back(make_pair(corner, Point3d(xCoefficient * 39, yCoefficient * 13.5, 0)));
     } else if (dx < 0.425 * frame.cols
                && dx > 0.325 * frame.cols
                && dy < 0.5 * frame.rows
                && dy > 0.2 * frame.rows) {
-      result.push_back(make_pair(corner, Point3d(xCoefficient * 18, yCoefficient * 21, 0)));
+      result.push_back(make_pair(corner, Point3d(xCoefficient * 21, yCoefficient * 18, 0)));
     } else if (dx < 0.55 * frame.cols
                && dx > 0.25 * frame.cols
                && dy < 0.2 * frame.rows) {
-      result.push_back(make_pair(corner, Point3d(xCoefficient * 18, yCoefficient * 39, 0)));
+      result.push_back(make_pair(corner, Point3d(xCoefficient * 21, yCoefficient * 18, 0)));
     } 
   }
 
