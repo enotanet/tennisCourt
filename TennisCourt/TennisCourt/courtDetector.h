@@ -3,9 +3,10 @@
 #include "opencv2/imgproc/imgproc.hpp"
 #include <vector>
 
-std::vector<cv::Vec2f> getCourt(cv::Mat &frame);
-cv::Mat preprocessCourt(cv::Mat &frame);
-void diplayCourtDetectorResult(cv::Mat &frame, cv::Mat &preprocesedFrame);
+std::vector<std::pair<cv::Point2f, cv::Point3d>> mapCourtCornersTo3DCoordinates(cv::Mat &frame, std::vector<cv::Point2f> courtCorners, int camera);
+std::vector<cv::Point2f> getCourtCorners(cv::Mat &frame);
+cv::Mat getCourtOnly(cv::Mat &frame);
+void diplayCourtDetectorResult(cv::Mat &frame, std::string windowName="Result");
 
 struct hash_point {
   long operator()(const cv::Point &point) const{
