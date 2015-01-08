@@ -57,3 +57,25 @@ int* getIntensities(Mat &image) {
 
   return intensities;
 }
+
+
+/**
+ * Returns an intensity value that occurs the most in the image
+ * Parameters:
+ * Mat &image - reference to an image
+ */
+int getModeIntensity(Mat &image) {
+  
+  int *intensities = getIntensities(image);
+  int maxNumberOfPixels = intensities[0];
+  int modeIntensity = 0;
+
+  for (int i = 1; i < 255; i++) {
+    if (intensities[i] > maxNumberOfPixels) {
+      maxNumberOfPixels = intensities[i];
+      modeIntensity = i;
+    }
+  }
+  
+  return modeIntensity;
+}

@@ -5,4 +5,6 @@
 
 void cutBetweenIntensities(cv::Mat &image, int lowerBound, int upperBound, bool inverse=false);
 int* getIntensities(cv::Mat &image);
+int getModeIntensity(cv::Mat &image);
+
 #endif
