@@ -232,8 +232,8 @@ int BallFinder::lowDistanceBetweenContours(int i, int j) {
 vector< vector<Point> > BallFinder::getRepresentatives() {
   vector< vector<Point> > representatives;
   vector<Point> cur;
-  for (int i = 0; i < contours.size(); ++i) {
-    int j = 0;
+  for (size_t i = 0; i < contours.size(); ++i) {
+    size_t j = 0;
     while (j < contours[i].size()) {
       cur.push_back(contours[i][j]);
       j += representativeFrequency;
@@ -260,7 +260,7 @@ void BallFinder::printContour(vector<Point> contour) {
 }
 
 void BallFinder::findPossibleBallPositions(int ballNotSeen, vector<Point2f> &candidates) {
-  for (int i = 0; i < contours.size(); ++i) {
+  for (size_t i = 0; i < contours.size(); ++i) {
     if (contours[i].size() <= ballContourSizeThreshold && 
         norm(centres[i] - lastBallPosition) < sqrt(ballNotSeen) * maxDistanceBetweenFrames) {
       candidates.push_back(centres[i]);
@@ -308,7 +308,7 @@ bool BallFinder::findBallNew(vector<Point2f> &ballpos, vector<Point2f> &candidat
     frameDifference = 1;
     vector<ballCandidate> newBallCandidates;
     Point2f currentPosition;
-    for (int i = 0; i < size; ++i) {
+    for (size_t i = 0; i < size; ++i) {
       //ballCandidate *candidate = &ballCandidates[i];
       DEBUG("next candidate" << endl);
       ballCandidate *candidate = &ballCandidates[i];
@@ -570,8 +570,8 @@ vector<object> BallFinder::findPlayerCandidates() {
   vector<object> result;
   object cur;
   //maxRight = maxLeft = maxTop = maxBottom = 0;
-  int size = 0;
-  int i = 0;
+  size_t size = 0;
+  size_t i = 0;
   //vector< vector<Point> >::iterator it = contours.begin();
   while (i < contours.size()) {
     if (!notIsolated[i]) {
