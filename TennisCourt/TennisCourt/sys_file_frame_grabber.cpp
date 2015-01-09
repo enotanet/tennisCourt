@@ -45,7 +45,7 @@ bool SystemFileFrameGrabber::getNextFrame(size_t stream, std::vector<cv::Mat> *r
   bool ret = grabbers[stream].getNextFrame(&(*res)[stream]);
   char buf[32];
   sprintf(buf, "Frames: %d\n", offset[stream]);
-  cv::putText((*res)[stream], buf, cv::Point(100, 100), CV_FONT_HERSHEY_COMPLEX, 3, cv::Scalar(0, 0, 0), 5, 8);
+  // cv::putText((*res)[stream], buf, cv::Point(100, 100), CV_FONT_HERSHEY_COMPLEX, 3, cv::Scalar(0, 0, 0), 5, 8);
   return ret;
 }
 

@@ -4,12 +4,78 @@
 #include "utils.h"
 #include "simple_calibrate.h"
 #include "court_display.h"
+#include "courtDetector.h"
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <vector>
 #include <set>
+#include <thread>
 
+#include <fstream>
 #include <ctime>
+
+const double k_fps = 60;
+const double comp_eps = 1e-6;
+
+template<typename T>
+bool myComp(const std::pair<int, T> &a, const std::pair<int, T> &b) {
+  return a.first < b.first;
+};
+
+double BallSpeedAt(FrameProcessor &fp, double time) {
+  cv::Point3d cur, prev;
+  if (!fp.GetBallPosition(time, &cur)) {
+    return nan("");
+  }
+  if (!fp.GetBallPosition(time - 1, &prev)) {
+    return nan("");
+  }
+  double dist = cv::norm(cur - prev);
+  return dist * k_fps;
+}
+
+bool is_bounce(const std::deque<std::pair<int, cv::Point3d>> &ballpos,
+               std::pair<double, cv::Point3d> cand) {
+  if (cand.second.z > 0.18) {
+    // Not a bounce. Over 18 cm
+    return false;
+  }
+  auto beg = std::lower_bound(ballpos.begin(), ballpos.end(),
+                std::make_pair((int) cand.first - 5, cv::Point3d()),
+                myComp<cv::Point3d>);
+  auto end = std::upper_bound(ballpos.begin(), ballpos.end(),
+                std::make_pair((int) cand.first + 5, cv::Point3d()),
+                myComp<cv::Point3d>);
+  for (auto it = beg; it != end; ++it) {
+    if (cand.second.z > it->second.z + comp_eps) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool is_hit(const std::deque<std::pair<int, cv::Point3d>> &ballpos,
+               std::pair<double, cv::Point3d> cand) {
+  auto beg = std::lower_bound(ballpos.begin(), ballpos.end(),
+                std::make_pair((int) cand.first - 5, cv::Point3d()),
+                myComp<cv::Point3d>);
+  auto end = std::upper_bound(ballpos.begin(), ballpos.end(),
+                std::make_pair((int) cand.first + 5, cv::Point3d()),
+                myComp<cv::Point3d>);
+  bool t1 = true, t2 = true;
+  // Can be improved taking into account side of court. I.e. sign of x.
+  //
+  for (auto it = beg; it != end; ++it) {
+    if (it->second.x + comp_eps < cand.second.x) {
+      t1 = false;
+    }
+    if (it->second.x > cand.second.x + comp_eps) {
+      t2 = false;
+    }
+  }
+
+  return t1 | t2;
+}
 
 // Intercepts key presses and does stuff. Needs to remember previous state
 // for everything that we output. Introduce MyImageShow that has a frame buffer 
@@ -20,33 +86,44 @@ void RunOfflineSystem(SystemFrameGrabber *grabber) {
   // What about ownership of grabber? Should be system-wide.
   //
   OutputBuffer outputBuffer;
+
+  std::vector<cv::Mat> frames = grabber->getContainer();
+  InitialiseOutput(frames.size() + 1);
+  grabber->getNextFrames(&frames);
+
+  std::vector<std::vector<std::pair<cv::Point2f, cv::Point3d>>> corn(frames.size());
   if (g_args["calibrate"].size() < 1) {
-    g_args["calibrate"].push_back("");
+    for (size_t i = 0; i < frames.size(); ++i) {
+      cv::Mat grayFrame = frames[i].clone();
+      cv::cvtColor(frames[i], grayFrame, CV_BGR2GRAY);
+      // grayFrame = grayFrame.clone();
+      diplayCourtDetectorResult(grayFrame);
+      corn[i] = mapCourtCornersTo3DCoordinates(grayFrame, getCourtCorners(grayFrame), 1);
+      for (auto y : corn[i]) {
+        DEBUG("MATCH " << y.first << " " << y.second);
+      }
+      DEBUG("\n\n");
+      cv::imwrite("wtf.png", grayFrame);
+    }
+  } else {
+    corn = CalibReadFile(g_args["calibrate"][0]);
   }
-  CalibratedCamera calib(CalibReadFile(g_args["calibrate"][0]));
+
+  CalibratedCamera calib(corn);
+  FrameProcessor proc(frames.size(), calib);
   if (g_args["cd"].size() < 1) {
     g_args["cd"].push_back("");
   }
   CourtDisplay displ("TennisCourt/TestData/Court/courtFromTop.jpg", g_args["cd"][0]);
-  CourtDisplay displ2("TennisCourt/TestData/Court/courtFromTop.jpg", g_args["cd"][0]);
-
-  std::vector<cv::Mat> frames = grabber->getContainer();
-  InitialiseOutput(frames.size() + 2);
-  FrameProcessor proc(frames.size());
 
   INFO("Found " << frames.size() << " things");
-//   if (g_args["skip"].size()) {
-//     int frames_to_skip;
-//     sscanf(g_args["skip"][0].c_str(), "%d", &frames_to_skip);
-//     for (int i = 0; i < frames_to_skip; ++i) {
-//       grabber->getNextFrames(&frames);
-//     }
-//   }
 
   // TODO(GUI): Introduce some nice slider and stuff!
   //
   char last_key = 'n';
   long long frame_position = -1;
+  long long last_ballpos = 0;
+  std::deque<std::pair<int, cv::Point3d>> ballpositions;
   while (last_key != 'q' && last_key != 27) {
     switch (last_key) {
     case 'p':
@@ -56,12 +133,6 @@ void RunOfflineSystem(SystemFrameGrabber *grabber) {
       break;
     case 's':
       frame_position += 50;
-      while (outputBuffer.lastFrame + 1 < frame_position) {
-        grabber->getNextFrames(&frames);
-        OutputResult res;
-        proc.ProcessFrames(frames, &res, &calib, &displ);
-        outputBuffer.put(res);
-      }
       break;
     default:
       // Default behaviour is advance one frame.
@@ -70,14 +141,134 @@ void RunOfflineSystem(SystemFrameGrabber *grabber) {
       break;
     }
 
-    while (outputBuffer.lastFrame < frame_position) {
-      grabber->getNextFrames(&frames);
+    while (frame_position + 64 > outputBuffer.lastFrame) {
+      if (!grabber->getNextFrames(&frames)) {
+        DEBUG("Couldn't grab frames?!?");
+        break;
+      }
       OutputResult res;
-      proc.ProcessFrames(frames, &res, &calib, &displ);
+      proc.ProcessFrames(frames, &res);
       outputBuffer.put(res);
+      DEBUG("Putting " << res.images.size() << " images at position "
+            << outputBuffer.lastFrame);
     }
-    DisplayOutput(outputBuffer.get(frame_position));
-    last_key = cv::waitKey(0);
+    while (frame_position + 5 > last_ballpos) {
+      cv::Point3d ballpos;
+      if (proc.GetBallPosition(last_ballpos, &ballpos)) {
+        ballpositions.emplace_back(last_ballpos, ballpos);
+      }
+      ++last_ballpos;
+    }
+    while (ballpositions.size() > 1024) {
+      ballpositions.pop_front();
+    }
+    cv::Point3d ballpos(-200, -200, -200);
+    auto it = std::lower_bound(ballpositions.begin(), ballpositions.end(),
+                  std::make_pair(frame_position, cv::Point3d()), myComp<cv::Point3d>);
+    if (it != ballpositions.end() && it->first == frame_position) {
+      ballpos = it->second;
+    }
+    bool bounce;
+    bool hit;
+    bool net;
+    if (ballpos.x < -100) {
+      bounce = hit = false;
+      net = false;
+    } else {
+      bounce = is_bounce(ballpositions,
+                std::make_pair(frame_position, ballpos));
+      hit = is_hit(ballpositions,
+                std::make_pair(frame_position, ballpos));
+      net = proc.NoFutureBalls(frame_position);
+      // Also add checks for proximity to the net.
+      // NoFutureBalls returns true too often.
+      //
+      if (std::abs(ballpos.x) > 1) {
+        net = false;
+      }
+      if (std::abs(ballpos.z) > 1.2) {
+        net = false;
+      }
+    }
+
+    DEBUG("Frame " << frame_position << " Bounce: " << bounce <<
+          " Hit: " << hit << " Net: " << net);
+
+    std::vector<cv::Point3d> players;
+    proc.GetPlayersPositions(frame_position, &players);
+    if (g_args.count("display")) {
+      OutputResult res;
+      res.images.resize(outputBuffer.get(frame_position).images.size());
+      cv::Scalar ballcol(255 * bounce, 255, 255 * hit);
+      for (size_t i = 0; i < outputBuffer.get(frame_position).images.size(); ++i) {
+        cv::cvtColor(outputBuffer.get(frame_position).images[i], res.images[i],
+            CV_GRAY2BGR);
+        if (ballpos.x > -100) {
+          cv::circle(res.images[i], calib.Project(i, ballpos),
+              2, ballcol, -1, 8);
+        }
+        for (auto pl : players) {
+          cv::circle(res.images[i], calib.Project(i, pl),
+              4, cv::Scalar(0, 255, 255), -1, 8);
+        }
+      }
+      DEBUG("I have " << outputBuffer.get(frame_position).images.size() << " images "
+            << "at step " << frame_position << " " << outputBuffer.lastFrame
+            << bounce << " " << hit);
+      proc.DrawBallPositions(frame_position, res.images);
+
+      res.images.push_back(cv::Mat::zeros(1, 1, CV_8U));
+      std::vector<cv::Point2d> players2d;
+      for (auto pl : players) {
+        players2d.emplace_back(pl.x, pl.y);
+      }
+      displ.display(cv::Point2d(ballpos.x, ballpos.y), players2d, &res.images.back());
+
+      DisplayOutput(res);
+      last_key = cv::waitKey(0);
+    }
+  }
+  const double comp_eps = 1e-9;
+  const double frames_per_second = 60;
+  int last_player_hit = -1000;
+  std::ofstream fout("annotation.txt");
+  for (size_t i = 0; i < ballpositions.size(); ++i) {
+    // fout << ballpositions[i].first << " " << ballpositions[i].second << std::endl;
+    if (i > 0 && i + 1 < ballpositions.size()) {
+      if (ballpositions[i].second.z + comp_eps < ballpositions[i - 1].second.z
+          && ballpositions[i].second.z + comp_eps < ballpositions[i + 1].second.z
+          && ballpositions[i].second.z < 0.18) {
+        // Report ball bounce.
+        //
+        DEBUG("Ball bounced at position " << ballpositions[i].second);
+        
+        fout << "bounce " << (double) ballpositions[i].first / frames_per_second
+            << " at " << ballpositions[i].second << " ; " << ballpositions[i].first
+            << std::endl;
+      }
+      if ((ballpositions[i].second.x + comp_eps < ballpositions[i - 1].second.x
+          && ballpositions[i].second.x + comp_eps < ballpositions[i + 1].second.x)
+        || (ballpositions[i].second.x < ballpositions[i - 1].second.x + comp_eps
+          && ballpositions[i].second.x < ballpositions[i + 1].second.x + comp_eps)) {
+          
+        if (ballpositions[i].first - last_player_hit < 20) {
+          // Report ball bounce.
+          //
+          DEBUG("Ball hit by player " << ballpositions[i].second);
+          
+          fout << "player hit " << (double) ballpositions[i].first / frames_per_second
+              << " at " << ballpositions[i].second << " ; " << ballpositions[i].first
+              << std::endl;
+          last_player_hit = ballpositions[i].first;
+        }
+      }
+      if (i % 120 == 0) {
+        auto trans = ballpositions[i].second - ballpositions[i - 1].second;
+        double speed = cv::norm(trans) * frames_per_second;
+        fout << "ball speed at " << (double) ballpositions[i].first / frames_per_second
+             << " is " << speed << " at pos " << ballpositions[i].second << std::endl;
+      }
+    }
   }
 }
 
@@ -108,10 +299,6 @@ void OutputBuffer::put(OutputResult res) {
   results[lastFrame % max_frames_to_keep] = res;
 }
 
-bool myComp(const std::pair<int, cv::Point2f> &a, const std::pair<int, cv::Point2f> &b) {
-  return a.first < b.first;
-};
-
 bool IntersectIn3d(size_t c1, cv::Point2d p1, size_t c2, cv::Point2d p2,
     CalibratedCamera *calib, cv::Point3d *res) {
   cv::Point3d A1, B1, A2, B2;
@@ -125,305 +312,126 @@ bool IntersectIn3d(size_t c1, cv::Point2d p1, size_t c2, cv::Point2d p2,
   return true;
 }
 
+void dummy(SingleCameraProcessor *proc, cv::Mat *frame) {
+  proc->addFrame(*frame);
+}
+
+void FrameProcessor::DrawBallPositions(int time, std::vector<cv::Mat> frames) {
+  for (size_t i = 0; i < frames.size(); ++i) {
+    processors[i].DrawBallPositions(time, frames[i]);
+  }
+}
+
 // TODO: Main function that deals with processing each set of frames.
 // Put the results in outputResult so it can be used to display now or later
 //
 void FrameProcessor::ProcessFrames(std::vector<cv::Mat> frames,
-    OutputResult *outputResult,
-    CalibratedCamera *calib,
-    CourtDisplay *displ,
-    CourtDisplay *displ2) {
-  // Multithread this & reading maybe. Reduce the number of clones!
+    OutputResult *outputResult) {
+  std::vector<std::thread> exec;
   for (size_t i = 0; i < frames.size(); ++i) {
-    cv::Point2f ballPosition(-1, -1);
-    std::vector<object> players;
-    std::vector<cv::Point2f> ballCandidates;
-    bool success = false;
-    if (ballFinders[i].addFrame(frames[i], ballPosition, players, ballCandidates)) {
-      cv::circle(frames[i], ballPosition, 4, cv::Scalar(0, 255, 0), -1, 8);
-
-      // Let's ignore players for a bit..
-      //
-      for (object player : players) {
-        cv::circle(frames[i], player.top, 2, cv::Scalar(255, 0, 0), -1, 8);
-        cv::circle(frames[i], player.bottom, 2, cv::Scalar(255, 0, 0), -1, 8);
-        cv::circle(frames[i], player.right, 2, cv::Scalar(255, 0, 0), -1, 8);
-        cv::circle(frames[i], player.left, 2, cv::Scalar(255, 0, 0), -1, 8);
-      }
-
-      if (ballPosition.x >= 0 && ballPosition.y >= 0) {
-        // DEBUG(ballPositions2d.size() << " " << origBallPositions2d.size());
-        DEBUG("Ball at " << ballPosition);
-        if (ballPosition.y > 150) {
-          // Hack for birds!
-          //
-          success = true;
-          framesWithBalls.insert(count);
-          ballPositions2d[i].push_back(std::make_pair(count, ballPosition));
-          ytime[i].push_back(std::make_pair(count, cv::Point2f(count, ballPosition.y)));
-          xtime[i].push_back(std::make_pair(count, cv::Point2f(count, ballPosition.x)));
-          origBallPositions2d[i].push_back(std::make_pair(count, ballPosition));
-        }
-      }
-    }
-    // Very noisy ball candidates.
-    //
-    for (cv::Point2f cand : ballCandidates) {
-      ballCandidates2d[i].push_back(std::make_pair(count, cand));
-      if (!success) {
-        ytimeTent[i].push_back(std::make_pair(count, cv::Point2f(count, cand.y)));
-        xtimeTent[i].push_back(std::make_pair(count, cv::Point2f(count, cand.x)));
-      }
-      cv::circle(frames[i], cand, 1, cv::Scalar(0, 255, 255), -1, 8);
-    }
-
-    if (players.size() > 0) {
-      // do something with the players positions
-    }
-    if (count % 30 == 0) {
-      // DEBUG("Doing trajectory analysis with " << ballPositions2d[i].size()
-      //       << " ball positions");
-      // std::vector<cv::Point3d> trajectories;
-      // BestTrajectories(ballPositions2d[i], &trajectories, 24, 18, 1.0);
-      // cv::RNG rng(42);
-      // for (cv::Point3d p : trajectories) {
-      //   drawParabola(frames[i], p.x, p.y, p.z, cv::Scalar(rng.uniform(0, 255),
-      //                                                     rng.uniform(0, 255),
-      //                                                     rng.uniform(0, 255)));
-      // }
-      // if (trajectories.size()) {
-      //   oa = trajectories.back().x;
-      //   ob = trajectories.back().y;
-      //   oc = trajectories.back().z;
-      // }
-      // for (auto p : ballPositions2d[i]) {
-      //   cv::circle(frames[i], p.second, 2, cv::Scalar(0, 255, 0), -1, 8);
-      // }
-
-      DEBUG("Doing analysis with y/time and x/time parabolas");
-      std::vector<ParabolaTraj2d> trajectories;
-      ComputeTrajectories(i, &trajectories);
-      if (trajectories.size()) {
-        // Try to extend the balls with points from ballCandidates.
-        //
-        // LinkedParabolaTrajectory2d linkedTrajectoriesI(ballPositions2d[i], trajectories);
-        bool change = false;
-        for (auto cand : ballCandidates2d[i]) {
-          if (framesWithBalls.find(cand.first) != framesWithBalls.end()) {
-            continue;
-          }
-
-          // cv::Point2d p(cand.second.x, cand.second.y);
-          // cv::Point2d q;
-          // if (linkedTrajectoriesI.EvaluateAt(cand.first, &q)) {
-          //   if (cv::norm(p - q) < 1.5) {
-          //     change = true;
-          //     ballPositions2d[i].push_back(cand);
-          //     ytime[i].push_back(std::make_pair(cand.first,
-          //         cv::Point2f(cand.first, cand.second.y)));
-          //     auto beg = std::lower_bound(ytimeTent[i].begin(), ytimeTent[i].end(), cand,
-          //         myComp);
-          //     auto end = std::upper_bound(ytimeTent[i].begin(), ytimeTent[i].end(), cand,
-          //         myComp);
-          //     ytimeTent[i].erase(beg, end);
-          //     xtime[i].push_back(std::make_pair(cand.first,
-          //         cv::Point2f(cand.first, cand.second.x)));
-          //     beg = std::lower_bound(xtimeTent[i].begin(), xtimeTent[i].end(), cand,
-          //         myComp);
-          //     end = std::upper_bound(xtimeTent[i].begin(), xtimeTent[i].end(), cand,
-          //         myComp);
-          //     xtimeTent[i].erase(beg, end);
-          //     framesWithBalls.insert(cand.first);
-          //   }
-          // }
-
-          // This is the initial code approximating it using any trajectory.
-          //
-          // Find a matching trajectory.
-          //
-          for (auto traj : trajectories) {
-            cv::Point2d p(cand.second.x, cand.second.y);
-            if (cv::norm(traj.evaluate(cand.first) - p) < 1.4) {
-              change = true;
-              ballPositions2d[i].push_back(cand);
-              ytime[i].push_back(std::make_pair(cand.first,
-                  cv::Point2f(cand.first, cand.second.y)));
-              auto beg = std::lower_bound(ytimeTent[i].begin(), ytimeTent[i].end(), cand,
-                  myComp);
-              auto end = std::upper_bound(ytimeTent[i].begin(), ytimeTent[i].end(), cand,
-                  myComp);
-              ytimeTent[i].erase(beg, end);
-              xtime[i].push_back(std::make_pair(cand.first,
-                  cv::Point2f(cand.first, cand.second.x)));
-              beg = std::lower_bound(xtimeTent[i].begin(), xtimeTent[i].end(), cand,
-                  myComp);
-              end = std::upper_bound(xtimeTent[i].begin(), xtimeTent[i].end(), cand,
-                  myComp);
-              xtimeTent[i].erase(beg, end);
-              framesWithBalls.insert(cand.first);
-              break;
-            }
-          }
-        }
-
-        if (change) {
-          std::sort(ballPositions2d[i].begin(), ballPositions2d[i].end(), myComp);
-          std::sort(ytime[i].begin(), ytime[i].end(), myComp);
-          std::sort(xtime[i].begin(), xtime[i].end(), myComp);
-          std::sort(ytimeTent[i].begin(), ytimeTent[i].end(), myComp);
-          std::sort(xtimeTent[i].begin(), xtimeTent[i].end(), myComp);
-        }
-        // Recompute trajectories.
-        //
-        ComputeTrajectories(i, &trajectories);
-        if (trajectories.size()) {
-          parab = trajectories.back();
-          // Find a "shortest" path between trajectories[0] and trajectories.back()
-          //
-          LinkedParabolaTrajectory2d linkedTrajectories(ballPositions2d[i], trajectories);
-
-          for (int t = 0; t <= count; ++t) {
-            cv::Point2d p;
-            if (linkedTrajectories.EvaluateAt(t, &p)) {
-              double ps = (double) t / count * 255.0;
-              cv::circle(frames[i], p, 4, cv::Scalar(255 - ps, 0, ps), 1, 8);
-            } else {
-              DEBUG("Failed to find suitable parabola for " << t);
-            }
-          }
-
-          for (auto p : ballPositions2d[i]) {
-            cv::circle(frames[i], p.second, 1.5, cv::Scalar(0, 255, 0), -1, 8);
-          }
-          for (auto p : origBallPositions2d[i]) {
-            cv::circle(frames[i], p.second, 1.5, cv::Scalar(0, 0, 255), -1, 8);
-          }
-          traj[i] = linkedTrajectories;
-        }
-      }
-    }
-    if (oa >= -1e-7) {
-      drawParabola(frames[i], oa, ob, oc, cv::Scalar(255, 0, 128));
-      for (auto p : ballPositions2d[i]) {
-        if (PointToParabolaDistance(p.second, oa, ob, oc) < 1.0) {
-          cv::circle(frames[i], p.second, 2, cv::Scalar(0, 255, 0), -1, 8);
-        }
-      }
-    }
-
-    cv::Point3f cameraCoords;
-    if (!cameraLocations[i].GetCoordinate(frames[i], &cameraCoords)) {
-      // Oops. Don't continue with analysis
-    }
-    outputResult->images.push_back(frames[i].clone());
+    exec.emplace_back(dummy, &processors[i], &frames[i]);
   }
-
-  // Just do it for 2. Fix it for more later.
-  //
-  if (calib && frames.size() >= 2) {
-    if (count % 30) {
-      bool canIntersect = true;
-      cv::Point2d P[frames.size()];
-      for (size_t i = 0; i < frames.size(); ++i) {
-        if (!ballPositions2d[i].size()) {
-          canIntersect = false;
-          break;
-        }
-        auto fpos = ballPositions2d[i].back();
-        if (fpos.first != count) {
-          canIntersect = false;
-          break;
-        }
-        P[i] = cv::Point2d(fpos.second.x, fpos.second.y);
-      }
-      if (canIntersect) {
-        cv::Point3d ball3d;
-        if (IntersectIn3d(0, P[0], 1, P[1], calib, &ball3d)) {
-          if (displ) {
-            cv::Mat courtWithBall;
-            displ->display(cv::Point2d(ball3d.x, ball3d.y),
-                std::vector<cv::Point2d>(), &courtWithBall);
-            outputResult->images.push_back(courtWithBall.clone());
-          }
-          if (displ2) {
-            cv::Mat courtWithBall;
-            displ->display(cv::Point2d(ball3d.x, ball3d.z),
-                std::vector<cv::Point2d>(), &courtWithBall);
-            outputResult->images.push_back(courtWithBall.clone());
-          }
-          cv::Mat XZimg = cv::Mat::zeros(128, 128, CV_8UC3);
-          cv::Point2d d(ball3d.x / 12 * 50 + 64, 128 - ball3d.z / 5 * 128);
-          cv::circle(XZimg, d, 2,
-              cv::Scalar(0, 255, 0), 1, 8);
-          outputResult->images.push_back(XZimg.clone());
-        }
-      }
-    } else {
-      std::vector<cv::Point2d> psy;
-      std::vector<cv::Point2d> psz;
-      for (int t = 0; t <= count; ++t) {
-        cv::Point2d P[frames.size()];
-        if (traj[0].EvaluateAt(t, &P[0])) {
-          if (traj[1].EvaluateAt(t, &P[1])) {
-            cv::Point3d ball3d;
-            if (IntersectIn3d(0, P[0], 1, P[1], calib, &ball3d)) {
-              psy.push_back(cv::Point2d(ball3d.x, ball3d.y));
-              psz.push_back(cv::Point2d(ball3d.x, ball3d.z));
-            }
-          }
-        }
-      }
-      if (displ) {
-        cv::Mat courtWithBall;
-        displ->displayMultiple(psy, &courtWithBall);
-        outputResult->images.push_back(courtWithBall.clone());
-      }
-      if (displ2) {
-        cv::Mat courtWithBall;
-        displ->displayMultiple(psz, &courtWithBall);
-        outputResult->images.push_back(courtWithBall.clone());
-      }
-      cv::Mat XZimg = cv::Mat::zeros(128, 128, CV_8UC3);
-      for (size_t t = 0; t < psz.size(); ++t) {
-        double ps = (double) t / psz.size() * 255.0;
-        cv::Point2d d(psz[t].x / 12 * 50 + 64, 128 - psz[t].y / 5 * 128);
-        cv::circle(XZimg, d, 2,
-            cv::Scalar(255 - ps, 0, ps), 1, 8);
-      }
-      outputResult->images.push_back(XZimg.clone());
+  for (size_t i = 0; i < exec.size(); ++i) {
+    exec[i].join();
+  }
+  if (g_args.count("display")) {
+    for (size_t i = 0; i < frames.size(); ++i) {
+      outputResult->images.push_back(frames[i].clone());
     }
   }
+  // DEBUG("Put " << outputResult->images.size() << " images in result set at count "
+  //       << count);
   ++count;
+  return;
 }
 
-bool FrameProcessor::ComputeTrajectories(int i,
-    std::vector<ParabolaTraj2d> *trajectories) {
-  trajectories->clear();
-  // Very dodgy. We want to guarantee that the same set of points was used to
-  // approximate both y/time and x/time parabolas.
-  //
-  std::vector<ParabolaTraj> ytrajectories;
-  BestTrajectories(ytime[i], ytimeTent[i], &ytrajectories);
+bool FrameProcessor::GetBallPosition(double time, cv::Point3d *ballpos) {
+  if (processors.size() < 2) {
+    return false;
+  }
+  // std::vector<std::pair<double, size_t>> confidences;
+  std::vector<double> confidences(processors.size());
+  for (size_t i = 0; i < processors.size(); ++i) {
+    confidences[i] = processors[i].trajectoryConfidence(time);
+    // confidences.emplace_back(processors[i].trajectoryConfidence(time), i);
+  }
+  // sort(confidences.begin(), confidences.end());
+  int cam0, cam1;
+  cam0 = 0;
+  cam1 = 1;
+  if (processors.size() >= 4) {
+    if (confidences[0] * confidences[1] < confidences[2] * confidences[3]) {
+      cam0 = 2;
+      cam1 = 3;
+    }
+  }
+  cv::Point3d A1, B1, A2, B2;
+  int iter = 0, recalc = 1;
+  bool ok = false;
+  while (iter < 3 && recalc) {
+    recalc = false;
+    ++iter;
+    bool succ = true;
+    if (!processors[cam0].vectorToBall(time, &A1, &B1)) {
+      succ = false;
+    }
+    if (!processors[cam1].vectorToBall(time, &A2, &B2)) {
+      succ = false;
+    }
+    if (succ) {
+      *ballpos = LineIntersect(A1, (B1 - A1), A2, (B2 - A2));
+    }
+    if (processors.size() == 4) {
+      if ((!succ || ballpos->x < 0) && cam0 + cam1 == 5) {
+        cam0 = 0;
+        cam1 = 1;
+        recalc = true;
+      } else if ((!succ || ballpos->x > 0) && cam0 + cam1 == 1) {
+        cam0 = 2;
+        cam1 = 3;
+        recalc = true;
+      }
+    }
+    ok |= succ;
+  }
+  return ok;
+}
 
-  std::vector<ParabolaTraj> xtrajectories;
-  BestTrajectories(xtime[i], xtimeTent[i], &xtrajectories);
-
-  // Match up y-t and x-t trajectories.
-  //
-  MatchXYTrajectories(xtime[i], xtrajectories, ytime[i], ytrajectories, trajectories);
-  
-  DEBUG(xtrajectories.size() << " " << ytrajectories.size()
-        << " " << trajectories->size());
+bool FrameProcessor::NoFutureBalls(double time) {
+  for (size_t i = 0; i < processors.size(); ++i) {
+    if (!processors[i].NoFutureBalls(time)) {
+      return false;
+    }
+  }
+  return true;
+}
+// Two player detection requires both cameras.
+//
+bool FrameProcessor::GetPlayersPositions(double time, std::vector<cv::Point3d> *players) {
+  if (processors.size() < 2) {
+    return false;
+  }
+  players->resize(processors.size() / 2);
+  for (size_t i = 0; i + 1 < processors.size(); i += 2) {
+    cv::Point3d A1, B1, A2, B2;
+    if (!processors[i].vectorToPlayer(time, &A1, &B1)) {
+      return false;
+    }
+    if (!processors[i + 1].vectorToPlayer(time, &A2, &B2)) {
+      return false;
+    }
+    (*players)[i / 2] = LineIntersect(A1, (B1 - A1), A2, (B2 - A2));
+  }
   return true;
 }
 
-bool MatchXYTrajectories(const std::vector<std::pair<int, cv::Point2f>> &xtime,
+bool MatchXYTrajectories(const std::deque<std::pair<int, cv::Point2f>> &xtime,
                          const std::vector<ParabolaTraj> &xtrajectories,
-                         const std::vector<std::pair<int, cv::Point2f>> &ytime,
+                         const std::deque<std::pair<int, cv::Point2f>> &ytime,
                          const std::vector<ParabolaTraj> &ytrajectories,
                          std::vector<ParabolaTraj2d> *trajectories) {
   const int min_common_points = 8;
-  const double trajectory_eps = 1.2;
+  const double trajectory_eps = 2.2;
   trajectories->clear();
   for (size_t i = 0; i < xtrajectories.size(); ++i) {
     // Optimise second loop to do a lookup instead of linear search.
@@ -489,7 +497,7 @@ bool MatchXYTrajectories(const std::vector<std::pair<int, cv::Point2f>> &xtime,
 // Returns the set of points within min_index, max_index that are within trajectory_eps
 // of the parabola.
 //
-bool ParabolaSatisfiedSet(const std::vector<std::pair<int, cv::Point2f>> &ballPositions,
+bool ParabolaSatisfiedSet(const std::deque<std::pair<int, cv::Point2f>> &ballPositions,
                           const int min_index,
                           const int max_index,
                           const ParabolaTraj &parab,
@@ -529,8 +537,8 @@ bool ParabolaSatisfiedSet(const std::vector<std::pair<int, cv::Point2f>> &ballPo
 // TODO: After projecting the points inside the plane where the ball flies, we can
 // assume a constant acceleration moving object as suggested in a paper by Fei.
 //
-void BestTrajectories(const std::vector<std::pair<int, cv::Point2f>> &ballPositions,
-                      const std::vector<std::pair<int, cv::Point2f>> &tentative,
+void BestTrajectories(const std::deque<std::pair<int, cv::Point2f>> &ballPositions,
+                      const std::deque<std::pair<int, cv::Point2f>> &tentative,
                       std::vector<ParabolaTraj> *trajectories,
                       int max_window_size,
                       int good_trajectory_threshold,
@@ -581,10 +589,10 @@ void BestTrajectories(const std::vector<std::pair<int, cv::Point2f>> &ballPositi
       cur_satisfied = satisfied.size();
       auto beg = std::lower_bound(tentative.begin(), tentative.end(),
           std::make_pair(ballPositions[mid].first - max_window_size, cv::Point2f(0, 0)),
-          myComp);
+          myComp<cv::Point2f>);
       auto end = std::upper_bound(tentative.begin(), tentative.end(),
           std::make_pair(ballPositions[mid].first + max_window_size, cv::Point2f(0, 0)),
-          myComp);
+          myComp<cv::Point2f>);
       for (auto it = beg; it != end; ++it) {
         if (PointToParabolaDistance(it->second, cur) < trajectory_eps) {
           cur_satisfied += 0.7;
@@ -692,7 +700,7 @@ void RunOnlineSystem(SystemFrameGrabber *grabber) {
 }
 
 LinkedParabolaTrajectory2d::LinkedParabolaTrajectory2d(
-    const std::vector<std::pair<int, cv::Point2f>> &points,
+    const std::deque<std::pair<int, cv::Point2f>> &points,
     const std::vector<ParabolaTraj2d> &trajectories) {
   DEBUG("Doing dejkstra with " << trajectories.size() << " trajectories");
   std::vector<double> dist(trajectories.size(), 1e100);
@@ -700,7 +708,7 @@ LinkedParabolaTrajectory2d::LinkedParabolaTrajectory2d(
   std::vector<char> used(trajectories.size(), 0);
   std::vector<int> prev(trajectories.size(), -1);
   satisfied.resize(trajectories.size());
-  const double trajectory_eps = 1.2;
+  const double trajectory_eps = 2.4;
 
   // Satisfied array ready.
   //
@@ -752,6 +760,17 @@ LinkedParabolaTrajectory2d::LinkedParabolaTrajectory2d(
     path.push_back(trajectories[c]);
     c = prev[c];
   }
+
+  // points is sorted by time.
+  //
+  for (auto p : points) {
+    cv::Point2d q;
+    if (EvaluateAt(p.first, &q)) {
+      if (cv::norm(cv::Point2d(p.second.x, p.second.y) - q) < trajectory_eps) {
+        goodPoints.push_back(p.first);
+      }
+    }
+  }
 }
 
 bool LinkedParabolaTrajectory2d::EvaluateAt(double t, cv::Point2d *p) {
@@ -778,6 +797,24 @@ bool LinkedParabolaTrajectory2d::EvaluateAt(double t, cv::Point2d *p) {
     return true;
   }
   return false;
+}
+
+double LinkedParabolaTrajectory2d::ConfidenceAt(double t) {
+  if (!goodPoints.size()) {
+    return 1e100;
+  }
+  // Can be replaced with binary search.
+  //
+  auto lb = std::lower_bound(goodPoints.begin(), goodPoints.end(), t);
+  auto ub = std::upper_bound(goodPoints.begin(), goodPoints.end(), t);
+  double best = 1e100;
+  if (lb != goodPoints.end()) {
+    best = std::min(best, std::abs(t - *lb));
+  }
+  if (ub != goodPoints.end()) {
+    best = std::min(best, std::abs(t - *ub));
+  }
+  return best;
 }
 
 double LinkedParabolaTrajectory2d::ParabolaDistance(
@@ -811,4 +848,302 @@ double LinkedParabolaTrajectory2d::ParabolaDistance(
     }
     return dist + 3.0 * (trajectories[b].first - trajectories[a].last);
   }
+}
+
+SingleCameraProcessor::SingleCameraProcessor(size_t id, const CalibratedCamera &calib) :
+    count(0) {
+  calib.GetParams(id, &P, &C, &Pinv);
+}
+
+bool SingleCameraProcessor::addFrame(cv::Mat frame) {
+  std::vector<cv::Point2f> newBallPositions;
+  std::vector<object> newPlayers;
+  std::vector<cv::Point2f> newBallCandidates;
+  if (ballFinder.addFrameNew(frame, newBallPositions, newPlayers, newBallCandidates)) {
+    for (auto ballpos : newBallPositions) {
+      ballPositionsOrig2d.emplace_back(count, ballpos);
+      AddBallPosition(count, ballpos);
+    }
+    if (newBallPositions.size() > 1) {
+      DEBUG("Multiple ball positions at step " << count);
+      for (auto ballpos : newBallPositions) {
+        DEBUG("Ball at " << ballpos);
+      }
+      DEBUG(std::endl);
+    }
+  } else {
+    for (auto ballcand : newBallCandidates) {
+      AddBallCandidate(count, ballcand);
+    }
+  }
+  const double player_perim_threshold = 75;
+  for (auto player : newPlayers) {
+    double p = cv::norm(player.top - player.left)
+             + cv::norm(player.left - player.bottom)
+             + cv::norm(player.bottom - player.right)
+             + cv::norm(player.right - player.top);
+    DEBUG("Player " << count << " " << p << " " << player.bottom);
+    // Only want to detect our player
+    //
+    if (p > player_perim_threshold) {
+      playerPosition2d.push_back({count, player});
+    }
+  }
+
+  const double point_on_trajectory_eps = 3.3;
+
+  if (count % recompute_steps == 0) {
+    ComputeTrajectories();
+    if (tempTrajectories.size()) {
+      bool change = false;
+      for (auto cand : ballCandidates2d) {
+        // No need to check the set. Should be consistent.
+        //
+        for (auto traj : tempTrajectories) {
+          cv::Point2d p(cand.second.x, cand.second.y);
+          if (cv::norm(traj.evaluate(cand.first) - p) < point_on_trajectory_eps) {
+            if (AddBallPosition(cand.first, cand.second)) {
+              change = true;
+            }
+            break;
+          }
+        }
+      }
+      if (change) {
+        std::sort(ballPositions2d.begin(), ballPositions2d.end(), myComp<cv::Point2f>);
+        // ComputeTrajectories();
+      }
+    }
+    // Another 'if' just in case something changed.
+    //
+    // if (tempTrajectories.size()) {
+    //   traj = LinkedParabolaTrajectory2d(ballPositions2d, tempTrajectories);
+    // }
+  }
+
+  ++count;
+  normalise();
+
+  return true;
+}
+
+bool SingleCameraProcessor::NoFutureBalls(double time) {
+  cv::Point2d ballpos;
+  BallPositionAt(time, &ballpos);
+  auto it = std::lower_bound(ballPositions2d.begin(), ballPositions2d.end(),
+        std::make_pair((int) time + 1, cv::Point2f()), myComp<cv::Point2f>);
+  int match = 0;
+  int iter = 0;
+  for (; it != ballPositions2d.end() && iter < 12; ++iter, ++it) {
+    if (it->first > time + 12) {
+      break;
+    }
+    cv::Point2d p(it->second.x, it->second.y);
+    if (cv::norm(p - ballpos) < 50) {
+      ++match;
+    }
+  }
+  return match < 3;
+}
+
+double SingleCameraProcessor::trajectoryConfidence(double time) {
+  std::pair<int, cv::Point2f> cand = {(int) time - 6, {}};
+  auto a = std::lower_bound(ballPositions2d.begin(),
+      ballPositions2d.end(), cand, myComp<cv::Point2f>);
+  cand.first = (int) time + 6;
+  auto b = std::upper_bound(ballPositions2d.begin(),
+      ballPositions2d.end(), cand, myComp<cv::Point2f>);
+  return -(b - a);
+  return traj.ConfidenceAt(time);
+}
+
+bool SingleCameraProcessor::BallPositionAt(double time, cv::Point2d *ballpos) {
+  if (ballPositions2d.size() < 2) {
+    return false;
+  }
+  std::pair<int, cv::Point2f> cand = {(int) time, {}};
+  auto a = std::lower_bound(ballPositions2d.begin(),
+      ballPositions2d.end(), cand, myComp<cv::Point2f>);
+  auto b = a - 1;
+  if (a == ballPositions2d.begin()) {
+    b = a + 1;
+  }
+  if (a == ballPositions2d.end()) {
+    --a;
+    b = a - 1;
+  } else if (b == ballPositions2d.end()) {
+    b = a - 1;
+  }
+  if (a->first == b->first) {
+    DEBUG("Ball positions with equal times!");
+    return false;
+  }
+  double best = std::abs(time - a->first) + std::abs(time - b->first);
+  if (best > 15) {
+    return false;
+  }
+  if (best > 10) {
+    auto s = a;
+    auto x = s;
+    int iter = 0;
+    while (x != ballPositions2d.begin() && iter < 5) {
+      --x;
+      ++iter;
+    }
+    for (iter = 0; x != ballPositions2d.end() && iter < 10; ++x, ++iter) {
+      auto y = x + 1;
+      if (x != ballPositions2d.end() && y != ballPositions2d.end()) {
+        if (std::abs(time - x->first) + std::abs(time - y->first) < best) {
+          best = std::abs(time - x->first) + std::abs(time - y->first);
+          a = x;
+          b = y;
+        }
+      }
+    }
+  }
+  double A = (a->second.x - b->second.x) / (a->first - b->first);
+  double B = a->second.x - A * a->first;
+  ballpos->x = A * time + B;
+
+  A = (a->second.y - b->second.y) / (a->first - b->first);
+  B = a->second.y - A * a->first;
+  ballpos->y = A * time + B;
+
+  return true;
+}
+
+bool SingleCameraProcessor::vectorToBall(double time, cv::Point3d *A, cv::Point3d *B) {
+  cv::Point2d frame_pos;
+  if (!BallPositionAt(time, &frame_pos)) {
+    return false;
+  }
+  return GetRay(frame_pos, A, B);
+  // if (!traj.EvaluateAt(time, &frame_pos)) {
+  //   return false;
+  // }
+}
+
+bool SingleCameraProcessor::PlayerPositionAt(double time, cv::Point2d *playerpos) {
+  if (!playerPosition2d.size()) {
+    return false;
+  }
+  std::pair<int, object> cand = {(int) time, object()};
+  auto a = std::lower_bound(playerPosition2d.begin(), playerPosition2d.end(),
+          cand, myComp<object>);
+  if (a != playerPosition2d.begin()) {
+    --a;
+  }
+  // Experiment with returning a->second.bottom and midpoint
+  //
+  // *playerpos = 0.25 * (a->second.top + a->second.bottom +
+  //       a->second.right + a->second.left);
+  *playerpos = cv::Point2d(a->second.bottom.x, a->second.bottom.y);
+  return true;
+}
+
+bool SingleCameraProcessor::vectorToPlayer(double time, cv::Point3d *A, cv::Point3d *B) {
+  cv::Point2d frame_pos;
+  if (!PlayerPositionAt(time, &frame_pos)) {
+    return false;
+  }
+  return GetRay(frame_pos, A, B);
+  // if (!traj.EvaluateAt(time, &frame_pos)) {
+  //   return false;
+  // }
+}
+
+void SingleCameraProcessor::DrawBallPositions(int time, cv::Mat frame) {
+  for (auto ball : ballPositions2d) {
+    if (ball.first < time - 16 || ball.first > time + 16) {
+      continue;
+    }
+    cv::circle(frame, ball.second, 4, cv::Scalar(0, 0, 255), 1, 8);
+  }
+  for (auto ball : ballPositionsOrig2d) {
+    if (ball.first < time - 16 || ball.first > time + 16) {
+      continue;
+    }
+    cv::circle(frame, ball.second, 2, cv::Scalar(255, 0, 0), -1, 8);
+  }
+}
+
+void SingleCameraProcessor::ComputeTrajectories() {
+  tempTrajectories.clear();
+  std::vector<ParabolaTraj> ytrajectories;
+  BestTrajectories(ytime, ytimeTent, &ytrajectories);
+
+  std::vector<ParabolaTraj> xtrajectories;
+  BestTrajectories(xtime, xtimeTent, &xtrajectories);
+
+  MatchXYTrajectories(xtime, xtrajectories, ytime, ytrajectories, &tempTrajectories);
+}
+
+bool SingleCameraProcessor::AddBallPosition(int frame_no, cv::Point2f ballpos) {
+  if (framesWithBalls.find(frame_no) != framesWithBalls.end()) {
+    DEBUG("Adding another point at frame " << frame_no << " : " << ballpos);
+    return false;
+  }
+  ballPositions2d.push_back({frame_no, ballpos});
+  framesWithBalls.insert(frame_no);
+  if (!RemoveBallCandidate(frame_no)) {
+    return false;
+  }
+  ytime.push_back({frame_no, cv::Point2f(frame_no, ballpos.y)});
+  xtime.push_back({frame_no, cv::Point2f(frame_no, ballpos.x)});
+  return true;
+}
+
+bool SingleCameraProcessor::AddBallCandidate(int frame_no, cv::Point2f ballcand) {
+  ballCandidates2d.push_back({frame_no, ballcand});
+  ytimeTent.push_back({frame_no, cv::Point2f(frame_no, ballcand.y)});
+  xtimeTent.push_back({frame_no, cv::Point2f(frame_no, ballcand.x)});
+  return true;
+}
+
+void removeFromDeque(int frame_no, std::deque<std::pair<int, cv::Point2f>> &d) {
+  std::pair<int, cv::Point2f> cand = {frame_no, cv::Point2f(0, 0)};
+  auto beg = std::lower_bound(d.begin(), d.end(), cand, myComp<cv::Point2f>);
+  auto end = std::upper_bound(d.begin(), d.end(), cand, myComp<cv::Point2f>);
+  d.erase(beg, end);
+}
+
+bool SingleCameraProcessor::RemoveBallCandidate(int frame_no) {
+  removeFromDeque(frame_no, ballCandidates2d);
+  removeFromDeque(frame_no, ytimeTent);
+  removeFromDeque(frame_no, xtimeTent);
+  return true;
+}
+
+template<typename T>
+void normaliseDeque(int minval, std::deque<std::pair<int, T>> &d) {
+  while (d.size() && d[0].first < minval) {
+    d.pop_front();
+  }
+}
+
+void SingleCameraProcessor::normalise() {
+  int minval = count - frames_to_keep;
+  normaliseDeque(minval, ballPositionsOrig2d);
+  normaliseDeque(minval, ballPositions2d);
+  normaliseDeque(minval, ballCandidates2d);
+  normaliseDeque(minval, playerPosition2d);
+  normaliseDeque(minval, ytime);
+  normaliseDeque(minval, ytimeTent);
+  normaliseDeque(minval, xtime);
+  normaliseDeque(minval, xtimeTent);
+}
+
+bool SingleCameraProcessor::GetRay(cv::Point2d frame_pos, cv::Point3d *a, cv::Point3d *b) {
+  *a = C;
+  cv::Mat x = cv::Mat::zeros(3, 1, CV_64F);
+  x.at<double>(0) = frame_pos.x;
+  x.at<double>(1) = frame_pos.y;
+  x.at<double>(2) = 1;
+  cv::Mat X = Pinv * x;
+  double w = X.at<double>(3);
+  *b = cv::Point3d(X.at<double>(0) / w,
+                   X.at<double>(1) / w,
+                   X.at<double>(2) / w);
+ 
+  return true;
 }

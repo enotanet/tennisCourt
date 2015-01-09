@@ -1,1 +1,1 @@
-make && ./binary --cd="TennisCourt/TestData/court_calib.txt" --calibrate="TennisCourt/TestData/courtOut.txt" --fin="../forgdrive/cam0/video2.mkv;../forgdrive/cam3/video2.mkv" --skip="756;750"
+make && ./binary --cd="TennisCourt/TestData/court_calib.txt" --calibrate="TennisCourt/TestData/courtOut.txt" --fin="../forgdrive/cam0/output.mkv;../forgdrive/cam3/output.mkv;../forgdrive/cam1/output.mkv;../forgdrive/cam2/output.mkv" --skip="6;0;5;7" --display=

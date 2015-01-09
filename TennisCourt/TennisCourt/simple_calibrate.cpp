@@ -123,7 +123,7 @@ bool ExtractCorners(std::string corners_file, SystemFrameGrabber *grabber,
   return true;
 }
 
-cv::Mat matFromPair(const std::pair<cv::Point2d, cv::Point3d> &p) {
+cv::Mat matFromPair(const std::pair<cv::Point2f, cv::Point3d> &p) {
   cv::Mat a = cv::Mat::zeros(2, 12, CV_64F);
   a.at<double>(0, 4) = -p.second.x;
   a.at<double>(0, 5) = -p.second.y;
@@ -158,11 +158,11 @@ bool EvaluateCalib(std::string corn_out, SystemFrameGrabber *grabber) {
   }
   int c, xx, yy;
   double x, y, z;
-  std::vector<std::pair<cv::Point2d, cv::Point3d>> cor;
+  std::vector<std::pair<cv::Point2f, cv::Point3d>> cor;
   while (cfile >> c >> xx >> yy >> x >> y >> z) {
     DEBUG("READ " << c << " " << xx << " " << yy << " " << x << " " << y << " " << z);
     cv::circle(frames[c], cv::Point(xx, yy), 2, cv::Scalar(0, 255, 0), -1, 8);
-    cor.push_back(std::make_pair(cv::Point2d(xx, yy), cv::Point3d(x, y, z)));
+    cor.push_back(std::make_pair(cv::Point2f(xx, yy), cv::Point3d(x, y, z)));
   }
   cfile.close();
 
@@ -206,9 +206,9 @@ bool EvaluateCalib(std::string corn_out, SystemFrameGrabber *grabber) {
   return true;
 }
 
-std::vector<std::vector<std::pair<cv::Point2d, cv::Point3d>>> CalibReadFile(
+std::vector<std::vector<std::pair<cv::Point2f, cv::Point3d>>> CalibReadFile(
     std::string corn_out) {
-  std::vector<std::vector<std::pair<cv::Point2d, cv::Point3d>>> cor;
+  std::vector<std::vector<std::pair<cv::Point2f, cv::Point3d>>> cor;
   std::ifstream cfile(corn_out);
   if (!cfile.is_open()) {
     DEBUG("ExtractCorners can't open corners file");
@@ -219,25 +219,25 @@ std::vector<std::vector<std::pair<cv::Point2d, cv::Point3d>>> CalibReadFile(
   while (cfile >> c >> xx >> yy >> x >> y >> z) {
     DEBUG("READ " << c << " " << xx << " " << yy << " " << x << " " << y << " " << z);
     while ((int) cor.size() <= c) {
-      cor.push_back(std::vector<std::pair<cv::Point2d, cv::Point3d>>());
+      cor.push_back(std::vector<std::pair<cv::Point2f, cv::Point3d>>());
     }
     x = x * k_FOOT_TO_M;
     y = y * k_FOOT_TO_M;
     z = z * k_FOOT_TO_M;
-    cor[c].push_back(std::make_pair(cv::Point2d(xx, yy), cv::Point3d(x, y, z)));
+    cor[c].push_back(std::make_pair(cv::Point2f(xx, yy), cv::Point3d(x, y, z)));
   }
   cfile.close();
   return cor;
 }
 
 CalibratedCamera::CalibratedCamera(
-    std::vector<std::vector<std::pair<cv::Point2d, cv::Point3d>>> pairs) {
+    std::vector<std::vector<std::pair<cv::Point2f, cv::Point3d>>> pairs) {
   Calibrate(pairs);
   calibrated = true;
 }
 
 void CalibratedCamera::Calibrate(
-    std::vector<std::vector<std::pair<cv::Point2d, cv::Point3d>>> pairs) {
+    std::vector<std::vector<std::pair<cv::Point2f, cv::Point3d>>> pairs) {
   P.resize(pairs.size());
   C.resize(pairs.size());
   Pinv.resize(pairs.size());
@@ -268,9 +268,14 @@ void CalibratedCamera::Calibrate(
     cv::invert(P[cam], Pinv[cam], cv::DECOMP_SVD);
     DEBUG(P[cam] * Pinv[cam]);
   }
+
+  DEBUG("asdasdasdsad");
+  for (size_t cam = 0; cam < pairs.size(); ++cam) {
+    DEBUG(P[cam]);
+  }
+  DEBUG("asdasdasdsad");
   calibrated = true;
 }
-
 
 bool CalibratedCamera::GetRay(size_t cam, cv::Point2d frame_pos,
     cv::Point3d *a, cv::Point3d *b) {
@@ -303,4 +308,12 @@ cv::Point2d CalibratedCamera::Project(size_t cam, cv::Point3d X) {
 
   cv::Mat m = P[cam] * M;
   return cv::Point2d(m.at<double>(0) / m.at<double>(2), m.at<double>(1) / m.at<double>(2));
+}
+
+bool CalibratedCamera::GetParams(size_t id, cv::Mat *p, cv::Point3d *c, cv::Mat *pinv)
+    const {
+  *p = P[id];
+  *c = C[id];
+  *pinv = Pinv[id];
+  return true;
 }

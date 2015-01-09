@@ -11,17 +11,18 @@ bool ExtractCorners(std::string corners_file, SystemFrameGrabber *grabber,
 
 bool EvaluateCalib(std::string corn_out, SystemFrameGrabber *grabber);
 
-std::vector<std::vector<std::pair<cv::Point2d, cv::Point3d>>> CalibReadFile(
+std::vector<std::vector<std::pair<cv::Point2f, cv::Point3d>>> CalibReadFile(
     std::string corn_out);
 
 class CalibratedCamera {
 public:
   CalibratedCamera() : calibrated(false) {}
-  CalibratedCamera(std::vector<std::vector<std::pair<cv::Point2d, cv::Point3d>>> pairs);
+  CalibratedCamera(std::vector<std::vector<std::pair<cv::Point2f, cv::Point3d>>> pairs);
+  bool GetParams(size_t id, cv::Mat *p, cv::Point3d *c, cv::Mat *pinv) const;
   bool GetRay(size_t cam, cv::Point2d frame_pos, cv::Point3d *a, cv::Point3d *b);
   cv::Point2d Project(size_t cam, cv::Point3d X);
 private:
-  void Calibrate(std::vector<std::vector<std::pair<cv::Point2d, cv::Point3d>>> pairs);
+  void Calibrate(std::vector<std::vector<std::pair<cv::Point2f, cv::Point3d>>> pairs);
 
   bool calibrated;
   std::vector<cv::Mat> P;

@@ -68,7 +68,7 @@ bool getParabola(std::vector<cv::Point2d> points, double *a, double *b, double *
     // No parabola;
     // This occurs way too often. Examine why!
     //
-    DEBUG("the first three points don't define a parabola");
+    // DEBUG("the first three points don't define a parabola");
     return false;
   }
   *a = (D * E - B * F) / det;

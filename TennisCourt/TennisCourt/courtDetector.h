@@ -3,7 +3,11 @@
 #include "opencv2/imgproc/imgproc.hpp"
 #include <vector>
 
-std::vector<std::pair<cv::Point2f, cv::Point3d>> mapCourtCornersTo3DCoordinates(cv::Mat &frame, std::vector<cv::Point2f> courtCorners, int camera);
+std::vector<std::pair<cv::Point2f, cv::Point3d>>
+    mapCourtCornersTo3DCoordinates(cv::Mat &frame,
+                                   std::vector<cv::Point2f> courtCorners,
+                                   int camera);
+
 std::vector<cv::Point2f> getCourtCorners(cv::Mat &frame);
 cv::Mat getCourtOnly(cv::Mat &frame);
 void diplayCourtDetectorResult(cv::Mat &frame, std::string windowName="Result");

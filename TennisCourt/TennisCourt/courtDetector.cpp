@@ -83,7 +83,7 @@ vector<pair<Point2f, Point3d>> mapCourtCornersTo3DCoordinates(Mat &frame, vector
     }
   }  
 
-  for (Point corner : longerSideCorners) {
+  for (Point2f corner : longerSideCorners) {
     double dx = abs(lowestCorner.x - corner.x);
     double dy = lowestCorner.y - corner.y;
     if (dx < 0.1 * frame.cols
@@ -140,6 +140,7 @@ vector<Point2f> getCourtCorners(Mat &frame) {
               0.0001 * frame.cols * frame.rows, 
               min(0.1 * frame.cols, 0.1 * frame.rows), 
               min(0.005 * frame.cols, 0.005 * frame.rows));
+  DEBUG("WTF " << lines.size());
 
   // Draw lines
   for( size_t i = 0; i < lines.size(); i++ ) {
@@ -270,8 +271,8 @@ Mat getCourtOnly(Mat &frame) {
     }
   }
 
-  //namedWindow("Preprocessed Frame", CV_WINDOW_AUTOSIZE);
-  //imshow("Preprocessed Frame", out);
+  // namedWindow("Preprocessed Frame", CV_WINDOW_AUTOSIZE);
+  // imshow("Preprocessed Frame", out);
 
   return out;
 }
