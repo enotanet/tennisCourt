@@ -303,6 +303,25 @@ bool BallFinder::findBallNew(vector<Point2f> &ballpos, vector<Point2f> &candidat
       } else 
         ++frameDifference;
     }
+    DEBUG("look for coexisting ball candidates" << endl);
+    vector<Point2f> startPoints = setsOfIsolatedPoints[numberOfFrames - 1];
+    vector<ballCandidate> candidates;
+    //DEBUG("have " << startPoints.size() << " start points" << endl);
+    for (Point2f p : startPoints) {
+      // new way of doing that
+      candidates = findBallCandidates(p);
+      for (ballCandidate bc : candidates) {
+        DEBUG("found sth" << endl);
+        DEBUG("lastPos: " << bc.lastPosition << endl);
+        if (norm(bc.lastPosition - currentPosition) > eps) {
+          DEBUG("insert " << endl);
+          ballCandidates.insert(ballCandidates.begin() + ballCandidates.size(), bc);
+        }
+      }
+      //if (candidates.size() > 0) 
+      //  ballCandidates.insert(ballCandidates.begin() + ballCandidates.size(), candidates.begin(),
+       //   candidates.end());
+    }
   } else if (size > 1) {
     DEBUG(endl << endl << "MORE THAN 1 CANDIDATE, size " << size << endl << endl << endl);
     frameDifference = 1;
@@ -793,6 +812,7 @@ int BallFinder::mymain(int argc, char *argv[])
   cout << capture.get(CV_CAP_PROP_FRAME_HEIGHT) << endl;
 
   int keyboard = 0;
+  int k = 0;
 
   while ((char) keyboard != 'q' && keyboard != 27) {
     if ((char) keyboard == 's') {
@@ -803,11 +823,11 @@ int BallFinder::mymain(int argc, char *argv[])
       }
     }
 
-    /*while (k < 500) {
+    while (k < 500) {
       capture.read(frame);
       updateFrames(frame);
       ++k;
-    }*/
+    }
 
     if (!capture.read(frame)) {
       cerr << "unable to read frame, exiting... " << endl;
