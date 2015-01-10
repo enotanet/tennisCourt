@@ -652,9 +652,9 @@ void BallFinder::obtainHogCandidates(vector<Rect> &foundRect) {
 bool BallFinder::foundCandidate(vector<Rect> &candidates, object &player, Rect &result) {
   for (auto candRect : candidates) {
     if (candRect.contains(player.centre)) {
-	  result = candRect;
-	  return true;
-	}
+      result = candRect;
+      return true;
+    }
   }
 
   return false;
@@ -666,12 +666,12 @@ Rect BallFinder:: getBoundingRectangle(object &player) {
 
   vector <Point> contourPts;
   for (auto idx : player.madeUpOf) {
-	for (auto pointContour : contours[idx]) {
-	  contourPts.push_back(pointContour);
-	}
+    for (auto pointContour : contours[idx]) {
+      contourPts.push_back(pointContour);
+    }
   }
-  approxPolyDP( Mat(contourPts), contours_poly, 2, true );
-  boundRect = boundingRect( Mat(contours_poly) );
+  approxPolyDP(Mat(contourPts), contours_poly, 2, true);
+  boundRect = boundingRect(Mat(contours_poly));
 
   return boundRect;
 }
@@ -682,11 +682,11 @@ void BallFinder::approxPlayersToRectangles(vector<object> &players) {
 
   for (object player : players) {
     Rect playerBox;
-	if (!foundCandidate(hogCandidates, player, playerBox)) {
-	  playerBox = getBoundingRectangle(player);
-	}
+    if (!foundCandidate(hogCandidates, player, playerBox)) {
+      playerBox = getBoundingRectangle(player);
+    }
 
-	rectangle(frame, playerBox, cv::Scalar(0,255,0), 3);
+    rectangle(frame, playerBox, cv::Scalar(0,255,0), 3);
   }
 }
 
