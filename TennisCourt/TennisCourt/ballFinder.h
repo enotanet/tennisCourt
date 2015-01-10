@@ -65,6 +65,12 @@ private:
   void printIsolatedPoints();
   void sortContours();
 
+  // Methods used to get rectangles approximations for players
+  void obtainHogCandidates(std::vector<cv::Rect> &foundRect);
+  cv::Rect getBoundingRectangle(object &player);
+  bool foundCandidate(std::vector<cv::Rect> &candidates, object &player, cv::Rect &result);
+  void approxPlayersToRectangles(std::vector<object> &players);
+
   std::vector<cv::Mat> frames; // will contain last 'numberOfFrames' frames
   std::vector< std::vector<cv::Point2f> > setsOfIsolatedPoints;
   std::vector< std::vector<cv::Point> > contours;

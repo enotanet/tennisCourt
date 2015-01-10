@@ -4,6 +4,7 @@
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/video/background_segm.hpp"
 #include "opencv2/video/tracking.hpp"
+#include <opencv2/objdetect/objdetect.hpp>
 #include <iostream>
 #include <sstream>
 #include <vector>
@@ -619,15 +620,88 @@ bool BallFinder::updatePlayerCandidate(object &candidate) {
   return false;
 }
 
+void BallFinder::obtainHogCandidates(vector<Rect> &foundRect) {
+  HOGDescriptor hog;
+  hog.setSVMDetector(HOGDescriptor::getDefaultPeopleDetector());
+  vector<Rect> found, found_filtered;
+  hog.detectMultiScale(frame, found, 0, Size(8, 8), Size(32, 32), 1.05, 2);
+
+  for (size_t i = 0; i < found.size(); i++)
+  {
+    Rect r = found[i];
+	size_t j;
+	for (j = 0; j < found.size(); j++)
+	  if (j != i && (r & found[j]) == r)
+		break;
+
+	  if (j == found.size())
+	    found_filtered.push_back(r);
+  }
+
+  for (size_t i = 0; i < found_filtered.size(); i++)
+  {
+	Rect r = found_filtered[i];
+	r.x += cvRound(r.width*0.1);
+	r.width = cvRound(r.width*0.8);
+	r.y += cvRound(r.height*0.06);
+	r.height = cvRound(r.height*0.9);
+	foundRect.push_back(r);
+  }
+}
+
+bool BallFinder::foundCandidate(vector<Rect> &candidates, object &player, Rect &result) {
+  for (auto candRect : candidates) {
+    if (candRect.contains(player.centre)) {
+	  result = candRect;
+	  return true;
+	}
+  }
+
+  return false;
+}
+
+Rect BallFinder:: getBoundingRectangle(object &player) {
+  vector<Point> contours_poly;
+  Rect boundRect;
+
+  vector <Point> contourPts;
+  for (auto idx : player.madeUpOf) {
+	for (auto pointContour : contours[idx]) {
+	  contourPts.push_back(pointContour);
+	}
+  }
+  approxPolyDP( Mat(contourPts), contours_poly, 2, true );
+  boundRect = boundingRect( Mat(contours_poly) );
+
+  return boundRect;
+}
+
+void BallFinder::approxPlayersToRectangles(vector<object> &players) {
+  vector<Rect> hogCandidates;
+//  obtainHogCandidates(hogCandidates);
+
+  for (object player : players) {
+    Rect playerBox;
+	if (!foundCandidate(hogCandidates, player, playerBox)) {
+	  playerBox = getBoundingRectangle(player);
+	}
+
+	rectangle(frame, playerBox, cv::Scalar(0,255,0), 3);
+  }
+}
+
 void BallFinder::findPlayers(vector<object> &players) {
   players = findPlayerCandidates();
-  for (object player : players) {
+
+  approxPlayersToRectangles(players);
+
+//  for (object player : players) {
     //float x = (player.top.x + player.bottom.x + player.left.x + player.right.x) / 4;
     //float y = (player.top.y + player.bottom.y + player.left.y + player.right.y) / 4;
     //circle(frame, Point2f(x, y), 4, Scalar(0, 255, 0), -1, 8);
-    circle(frame, player.centre, 4, Scalar(100, 100, 100), -1, 8);
+//    circle(frame, player.centre, 4, Scalar(100, 100, 100), -1, 8);
     //DEBUG("centre " << player.centre << endl);
-  }
+//  }
 
   /*
   if (playerCandidates.size() == 0) 
